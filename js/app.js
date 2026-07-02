@@ -126,7 +126,9 @@ async function ensureSeedData(userId) {
                 { user_id: userId, name: 'Liquid Funds', is_recurring: true },
                 { user_id: userId, name: 'PF', is_recurring: true },
                 { user_id: userId, name: 'Gold (SGB)', is_recurring: false },
-                { user_id: userId, name: 'Fixed Deposits', is_recurring: false }
+                { user_id: userId, name: 'Fixed Deposits', is_recurring: false },
+                { user_id: userId, name: 'Stocks', is_recurring: false },
+                { user_id: userId, name: 'Other Assets', is_recurring: false }
             ]);
         }
     } catch (e) {
@@ -203,8 +205,10 @@ export async function navigateTo(viewName) {
         
         await views[viewName].render(appContent, selectedMonth);
         
-        // Post render: check for salary notification banner (except if selected month has salary logged or on other screens if needed)
-        await checkSalaryBanner();
+        // Post render: check for salary banner ONLY on dashboard tab
+        if (viewName === 'dashboard') {
+            await checkSalaryBanner();
+        }
         
     } catch (e) {
         console.error("Navigation routing failure:", e);
@@ -247,9 +251,9 @@ function setupCredentialsOverlay() {
 
     document.getElementById('btn-reconnect-db').addEventListener('click', () => {
         showSetupOverlay(true);
-        // Pre-fill
-        document.getElementById('setup-url').value = localStorage.getItem('FIN_SUPABASE_URL') || '';
-        document.getElementById('setup-key').value = localStorage.getItem('FIN_SUPABASE_ANON_KEY') || '';
+        // Pre-fill from sessionStorage
+        document.getElementById('setup-url').value = sessionStorage.getItem('FIN_SUPABASE_URL') || '';
+        document.getElementById('setup-key').value = sessionStorage.getItem('FIN_SUPABASE_ANON_KEY') || '';
     });
 }
 

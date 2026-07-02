@@ -383,7 +383,23 @@ function setupPortfolioListeners(categories, holdings, selectedMonth) {
 }
 
 /**
- * Handle new holdings creation modal
+ * Derive a machine-readable asset_type from the category name
+ */
+function getAssetType(catName) {
+    const n = catName.toLowerCase();
+    if (n.includes('fixed deposit') || n.includes('fd')) return 'fd';
+    if (n.includes('stock')) return 'stock';
+    if (n.includes('gold') || n.includes('sgb')) return 'gold';
+    if (n.includes('us fund') || n.includes('us ')) return 'us_fund';
+    if (n.includes('mutual')) return 'mutual_fund';
+    if (n.includes('liquid')) return 'liquid_fund';
+    if (n.includes('pf') || n.includes('provident')) return 'pf';
+    if (n.includes('other') || n.includes('custom')) return 'custom';
+    return 'custom';
+}
+
+/**
+ * Handle new holdings creation modal — smart context-aware form
  */
 function openHoldingModal(categories) {
     if (categories.length === 0) {
@@ -396,7 +412,7 @@ function openHoldingModal(categories) {
             <h3 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 mb-1">
                 <i data-lucide="piggy-bank" class="text-emerald-600"></i> New Asset Holding
             </h3>
-            <p class="text-slate-500 text-xs mb-5">Create manual holding logs below. Fields adjust based on category choice.</p>
+            <p class="text-slate-500 text-xs mb-5">Fields adjust automatically based on the category you select.</p>
 
             <form id="new-holding-form" class="space-y-4">
                 <div>
@@ -405,24 +421,16 @@ function openHoldingModal(categories) {
                         ${categories.map(c => `<option value="${c.id}" data-is-recurring="${c.is_recurring}" data-name="${c.name}">${c.name}</option>`).join('')}
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Holding (Asset) Name</label>
-                    <input type="text" id="hold-name" required placeholder="E.g., Parag Parikh Flexi Cap, SBI 5Yr FD, SGB 2026 Series I" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
-                </div>
 
-                <!-- Recurring fields (Displayed if Category is recurring) -->
-                <div id="wrapper-recurring-fields" class="space-y-4">
+                <!-- === FD FIELDS (Fixed Deposits) === -->
+                <div id="wrapper-fd-fields" class="space-y-4 hidden">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Monthly Contribution / SIP Amount</label>
-                        <input type="number" id="hold-sip" min="0" step="1" value="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">FD Bank Name</label>
+                        <input type="text" id="hold-fd-bank" placeholder="E.g., HDFC Bank, SBI, IDFC" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
                     </div>
-                </div>
-
-                <!-- One Time fields (Displayed if Category is one-time FD/SGB) -->
-                <div id="wrapper-one-time-fields" class="space-y-4 hidden">
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Invested Amount (Principal)</label>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Principal Invested (₹)</label>
                             <input type="number" id="hold-principal" value="0" min="0" step="0.01" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
                         </div>
                         <div>
@@ -442,26 +450,95 @@ function openHoldingModal(categories) {
                     </div>
                 </div>
 
-                <!-- Current Valuation (Manual starting estimate) -->
+                <!-- === STOCK FIELDS === -->
+                <div id="wrapper-stock-fields" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Stock / Company Name</label>
+                        <input type="text" id="hold-stock-name" placeholder="E.g., Infosys, HDFC Bank, Reliance" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Qty Held <span class="text-slate-350 font-normal">(Optional)</span></label>
+                            <input type="number" id="hold-stock-qty" placeholder="No. of shares" min="0" step="1" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Avg Buy Price (₹) <span class="text-slate-350 font-normal">(Optional)</span></label>
+                            <input type="number" id="hold-stock-price" placeholder="Per share price" min="0" step="0.01" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Total Invested (₹) <span class="text-slate-400 font-normal normal-case">(auto-fills from Qty × Price)</span></label>
+                        <input type="number" id="hold-stock-invested" placeholder="Or enter manually" min="0" step="0.01" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                    </div>
+                </div>
+
+                <!-- === GOLD/SGB FIELDS === -->
+                <div id="wrapper-gold-fields" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">SGB Series / Gold Asset Name</label>
+                        <input type="text" id="hold-gold-name" placeholder="E.g., SGB 2026 Series I, Physical Gold" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Initial Principal (₹)</label>
+                        <input type="number" id="hold-gold-principal" value="0" min="0" step="0.01" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Issue Date</label>
+                            <input type="date" id="hold-gold-start" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Maturity Date (Optional)</label>
+                            <input type="date" id="hold-gold-end" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- === RECURRING SIP FIELDS (Mutual Funds, Liquid, PF, US Funds) === -->
+                <div id="wrapper-recurring-fields" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="label-hold-name">Fund / Holding Name</label>
+                        <input type="text" id="hold-name" placeholder="E.g., Parag Parikh Flexi Cap, HDFC Top 100" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1" id="label-hold-sip">Monthly SIP Amount</label>
+                        <input type="number" id="hold-sip" min="0" step="1" value="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                    </div>
+                </div>
+
+                <!-- === CUSTOM / OTHER ASSETS === -->
+                <div id="wrapper-custom-fields" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Asset Name</label>
+                        <input type="text" id="hold-custom-name" placeholder="E.g., Silver, Real Estate, Crypto" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Amount Invested (₹)</label>
+                        <input type="number" id="hold-custom-invested" value="0" min="0" step="0.01" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                    </div>
+                </div>
+
+                <!-- === SHARED: Current Value (always shown) === -->
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Current Value / Valuation Estimate</label>
-                    <input type="number" id="hold-current" required min="0" step="0.01" placeholder="Initial value equivalent" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
+                    <input type="number" id="hold-current" required min="0" step="0.01" placeholder="Current market value" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 font-mono text-xs" />
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Observational Notes</label>
-                    <input type="text" id="hold-notes" placeholder="Optional comments on holding parameters" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Observational Notes (Optional)</label>
+                    <input type="text" id="hold-notes" placeholder="Any extra details about this holding" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
                 </div>
 
+                <!-- USD Badge for US Funds -->
                 <div id="usd-flag-wrapper" class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between hidden">
-                    <span class="text-xs font-semibold text-indigo-900">US Asset Detected! Convert display values to USD ($)?</span>
-                    <span class="text-[9px] uppercase tracking-wider font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full inline-block">USD Enabled</span>
+                    <span class="text-xs font-semibold text-indigo-900">US Asset — values stored and displayed in USD ($)</span>
+                    <span class="text-[9px] uppercase tracking-wider font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full inline-block">USD</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
                     <button type="button" id="btn-cancel-hold" class="py-2 border border-slate-200 text-slate-600 font-medium rounded-lg text-xs hover:bg-slate-50 transition-all">Cancel</button>
                     <button type="submit" class="py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium shadow-lg shadow-emerald-600/10 transition-all flex items-center justify-center gap-1">
-                        <i data-lucide="check" class="w-3.5 h-3.5"></i> Save Asset Asset
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i> Save Asset Holding
                     </button>
                 </div>
             </form>
@@ -472,89 +549,139 @@ function openHoldingModal(categories) {
         document.getElementById('btn-cancel-hold').addEventListener('click', closeModal);
 
         const selectCat = document.getElementById('hold-cat-id');
-        const recurDiv = document.getElementById('wrapper-recurring-fields');
-        const nonRecurDiv = document.getElementById('wrapper-one-time-fields');
-        const usdFlag = document.getElementById('usd-flag-wrapper');
+
+        // Wrappers for each asset type
+        const wrappers = {
+            fd: document.getElementById('wrapper-fd-fields'),
+            stock: document.getElementById('wrapper-stock-fields'),
+            gold: document.getElementById('wrapper-gold-fields'),
+            recurring: document.getElementById('wrapper-recurring-fields'),
+            custom: document.getElementById('wrapper-custom-fields'),
+        };
 
         const toggleFields = () => {
             const selectedOpt = selectCat.selectedOptions[0];
             const isRecur = selectedOpt.getAttribute('data-is-recurring') === 'true';
-            const name = selectedOpt.getAttribute('data-name');
+            const catName = selectedOpt.getAttribute('data-name');
+            const assetType = getAssetType(catName);
 
-            if (isRecur) {
-                recurDiv.classList.remove('hidden');
-                nonRecurDiv.classList.add('hidden');
-            } else {
-                recurDiv.classList.add('hidden');
-                nonRecurDiv.classList.remove('hidden');
-            }
+            // Hide all wrappers first
+            Object.values(wrappers).forEach(w => w.classList.add('hidden'));
+            document.getElementById('usd-flag-wrapper').classList.add('hidden');
 
-            if (name === 'US Funds') {
-                usdFlag.classList.remove('hidden');
+            if (assetType === 'fd') {
+                wrappers.fd.classList.remove('hidden');
+            } else if (assetType === 'stock') {
+                wrappers.stock.classList.remove('hidden');
+            } else if (assetType === 'gold') {
+                wrappers.gold.classList.remove('hidden');
+            } else if (assetType === 'us_fund') {
+                wrappers.recurring.classList.remove('hidden');
+                document.getElementById('label-hold-name').textContent = 'US Fund Name';
+                document.getElementById('label-hold-sip').textContent = 'Monthly SIP Amount ($)';
+                document.getElementById('usd-flag-wrapper').classList.remove('hidden');
+            } else if (isRecur) {
+                wrappers.recurring.classList.remove('hidden');
+                document.getElementById('label-hold-name').textContent = 'Fund / Holding Name';
+                document.getElementById('label-hold-sip').textContent = 'Monthly SIP Amount (₹)';
             } else {
-                usdFlag.classList.add('hidden');
+                // Default for custom / other assets / anything unrecognized
+                wrappers.custom.classList.remove('hidden');
             }
         };
 
-        // Attach category adjust
+        // Auto-calculate Stocks invested from qty × price
+        const stockQty = document.getElementById('hold-stock-qty');
+        const stockPrice = document.getElementById('hold-stock-price');
+        const stockInvested = document.getElementById('hold-stock-invested');
+        const autoCalc = () => {
+            const qty = parseFloat(stockQty.value);
+            const price = parseFloat(stockPrice.value);
+            if (!isNaN(qty) && !isNaN(price) && qty > 0 && price > 0) {
+                stockInvested.value = (qty * price).toFixed(2);
+            }
+        };
+        stockQty.addEventListener('input', autoCalc);
+        stockPrice.addEventListener('input', autoCalc);
+
         selectCat.addEventListener('change', toggleFields);
-        toggleFields(); // Init setup
+        toggleFields(); // Init on open
 
         document.getElementById('new-holding-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const categoryId = selectCat.value;
             const selectedOpt = selectCat.selectedOptions[0];
+            const categoryId = selectCat.value;
             const isRecur = selectedOpt.getAttribute('data-is-recurring') === 'true';
             const catName = selectedOpt.getAttribute('data-name');
+            const assetType = getAssetType(catName);
+            const currency = assetType === 'us_fund' ? 'USD' : 'INR';
 
-            const name = document.getElementById('hold-name').value;
-            const currentVal = parseFloat(document.getElementById('hold-current').value);
+            const currentVal = parseFloat(document.getElementById('hold-current').value) || 0;
             const notes = document.getElementById('hold-notes').value;
 
-            // Recur parameters
-            let monthlySip = 0;
-            if (isRecur) {
-                monthlySip = parseFloat(document.getElementById('hold-sip').value || 0);
-            }
-
-            // One-time parameters
+            // Derive name, invested, and extra fields based on asset type
+            let holdingName = '';
             let investedAmt = 0;
+            let monthlySip = 0;
             let interestRate = null;
             let startDate = null;
             let maturityDate = null;
+            let fdBankName = null;
 
-            if (!isRecur) {
-                investedAmt = parseFloat(document.getElementById('hold-principal').value || 0);
-                const rateInput = document.getElementById('hold-rate').value;
-                if (rateInput) interestRate = parseFloat(rateInput);
-                const startInput = document.getElementById('hold-start').value;
-                if (startInput) startDate = startInput;
-                const endInput = document.getElementById('hold-end').value;
-                if (endInput) maturityDate = endInput;
+            if (assetType === 'fd') {
+                fdBankName = document.getElementById('hold-fd-bank').value || 'Unknown Bank';
+                holdingName = fdBankName + ' FD';
+                investedAmt = parseFloat(document.getElementById('hold-principal').value) || 0;
+                const rateVal = document.getElementById('hold-rate').value;
+                if (rateVal) interestRate = parseFloat(rateVal);
+                const startVal = document.getElementById('hold-start').value;
+                if (startVal) startDate = startVal;
+                const endVal = document.getElementById('hold-end').value;
+                if (endVal) maturityDate = endVal;
+            } else if (assetType === 'stock') {
+                holdingName = document.getElementById('hold-stock-name').value;
+                investedAmt = parseFloat(document.getElementById('hold-stock-invested').value) || 0;
+            } else if (assetType === 'gold') {
+                holdingName = document.getElementById('hold-gold-name').value;
+                investedAmt = parseFloat(document.getElementById('hold-gold-principal').value) || 0;
+                const startVal = document.getElementById('hold-gold-start').value;
+                if (startVal) startDate = startVal;
+                const endVal = document.getElementById('hold-gold-end').value;
+                if (endVal) maturityDate = endVal;
+            } else if (assetType === 'custom') {
+                holdingName = document.getElementById('hold-custom-name').value;
+                investedAmt = parseFloat(document.getElementById('hold-custom-invested').value) || 0;
+            } else {
+                // Recurring: mutual fund, liquid, pf, us_fund
+                holdingName = document.getElementById('hold-name').value;
+                monthlySip = parseFloat(document.getElementById('hold-sip').value) || 0;
             }
 
-            const currency = catName === 'US Funds' ? 'USD' : 'INR';
+            if (!holdingName.trim()) {
+                alert('Please enter an asset name.');
+                return;
+            }
 
             showActionSpinner(true);
             try {
-                const { error } = await supabase
-                    .from('holdings')
-                    .insert({
-                        user_id: currentUser.id,
-                        category_id: categoryId,
-                        name,
-                        is_recurring: isRecur,
-                        monthly_contribution: monthlySip,
-                        current_value: currentVal,
-                        notes,
-                        invested_amount: investedAmt,
-                        interest_rate: interestRate,
-                        start_date: startDate,
-                        maturity_date: maturityDate,
-                        currency
-                    });
+                const { error } = await supabase.from('holdings').insert({
+                    user_id: currentUser.id,
+                    category_id: categoryId,
+                    name: holdingName,
+                    asset_type: assetType,
+                    is_recurring: isRecur,
+                    monthly_contribution: monthlySip,
+                    current_value: currentVal,
+                    notes,
+                    invested_amount: investedAmt,
+                    interest_rate: interestRate,
+                    start_date: startDate,
+                    maturity_date: maturityDate,
+                    fd_bank_name: fdBankName,
+                    currency
+                });
                 if (error) throw error;
-                
+
                 closeModal();
                 await reFetchAndRenderCurrentView();
             } catch (err) {
@@ -565,6 +692,7 @@ function openHoldingModal(categories) {
         });
     });
 }
+
 
 /**
  * Handle manual SIP monthly confirmer (pending confirming)

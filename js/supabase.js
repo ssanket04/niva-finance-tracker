@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Read from Vite env variables or fallback to dynamically configured ones stored in local storage
-let supabaseUrl = import.meta.env.VITE_SUPABASE_URL || localStorage.getItem('FIN_SUPABASE_URL') || '';
-let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('FIN_SUPABASE_ANON_KEY') || '';
+// Read from Vite env variables or fallback to dynamically configured ones stored in sessionStorage
+// sessionStorage is safer than localStorage: credentials auto-clear when browser tab is closed
+let supabaseUrl = import.meta.env.VITE_SUPABASE_URL || sessionStorage.getItem('FIN_SUPABASE_URL') || '';
+let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || sessionStorage.getItem('FIN_SUPABASE_ANON_KEY') || '';
 
 export let supabase = null;
 
@@ -19,8 +20,8 @@ if (isSupabaseConfigured()) {
 }
 
 export function saveSupabaseConfig(url, anonKey) {
-    localStorage.setItem('FIN_SUPABASE_URL', url.trim());
-    localStorage.setItem('FIN_SUPABASE_ANON_KEY', anonKey.trim());
+    sessionStorage.setItem('FIN_SUPABASE_URL', url.trim());
+    sessionStorage.setItem('FIN_SUPABASE_ANON_KEY', anonKey.trim());
     supabaseUrl = url.trim();
     supabaseAnonKey = anonKey.trim();
     supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -28,8 +29,8 @@ export function saveSupabaseConfig(url, anonKey) {
 }
 
 export function clearSupabaseConfig() {
-    localStorage.removeItem('FIN_SUPABASE_URL');
-    localStorage.removeItem('FIN_SUPABASE_ANON_KEY');
+    sessionStorage.removeItem('FIN_SUPABASE_URL');
+    sessionStorage.removeItem('FIN_SUPABASE_ANON_KEY');
     supabaseUrl = '';
     supabaseAnonKey = '';
     supabase = null;
