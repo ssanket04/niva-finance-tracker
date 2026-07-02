@@ -74,7 +74,7 @@ export async function render(container, selectedMonth) {
         // --- 2. REPORTS CALCULATIONS ---
         // Savings = Income − Expenses − Investment Contributions
         const savings = totalIncome - totalExpenses - totalContributions;
-        const savingsRate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
+        const savingsRate = totalIncome > 0 ? (((totalIncome - totalExpenses) / totalIncome) * 100) : 0;
 
         const prevSavings = prevTotalIncome - prevTotalExpenses - prevTotalContributions;
 
@@ -170,7 +170,7 @@ export async function render(container, selectedMonth) {
                         <span class="font-mono font-bold text-indigo-600 text-base">${formatCurrency(totalContributions)}</span>
                     </div>
                     <div class="bento-card p-4 bg-emerald-500/[0.03]">
-                        <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider block mb-0.5">Net Savings</span>
+                        <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider block mb-0.5">Unallocated Cash</span>
                         <span class="font-mono font-bold text-slate-900 text-base">${formatCurrency(savings)}</span>
                     </div>
                     <div class="bento-card p-4 bg-emerald-500/[0.03]">
@@ -221,10 +221,13 @@ export async function render(container, selectedMonth) {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-150">
-                                ${incomes.length === 0 ? `
-                                    <tr>
-                                        <td colspan="3" class="p-6 text-center text-slate-400 italic">No income entries this month.</td>
-                                    </tr>
+                                 ${incomes.length === 0 ? `
+                                     <tr>
+                                         <td colspan="3" class="p-6 text-center text-slate-400">
+                                             <p class="font-medium text-slate-500 text-xs">No income entries logged this month.</p>
+                                             <p class="text-[10px] text-slate-400 mt-1">Log credits in the Income workspace to view reports here.</p>
+                                         </td>
+                                     </tr>
                                 ` : incomes.map(item => `
                                     <tr class="hover:bg-slate-50/30 transition-all">
                                         <td class="p-3 font-semibold text-slate-800">${escapeHTML(item.income_sources?.name || 'Unassigned')}</td>
@@ -250,10 +253,13 @@ export async function render(container, selectedMonth) {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-150">
-                                ${Object.keys(expenseCategoryAgg).length === 0 ? `
-                                    <tr>
-                                        <td colspan="3" class="p-6 text-center text-slate-400 italic">No expense entries this month.</td>
-                                    </tr>
+                                 ${Object.keys(expenseCategoryAgg).length === 0 ? `
+                                     <tr>
+                                         <td colspan="3" class="p-6 text-center text-slate-400">
+                                             <p class="font-medium text-slate-500 text-xs">No expense entries logged this month.</p>
+                                             <p class="text-[10px] text-slate-400 mt-1">Record outflows in the Expenses workspace to view breakdowns.</p>
+                                         </td>
+                                     </tr>
                                 ` : Object.entries(expenseCategoryAgg).map(([name, sum]) => {
                                     const percentageVal = totalExpenses > 0 ? (sum / totalExpenses) * 100 : 0;
                                     return `
@@ -288,10 +294,13 @@ export async function render(container, selectedMonth) {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-150">
-                                ${bankLedgers.length === 0 ? `
-                                    <tr>
-                                        <td colspan="4" class="p-6 text-center text-slate-400 italic font-sans animate-pulse">No balance ledgers logged for ${getMonthName(selectedMonth)} yet.</td>
-                                    </tr>
+                                 ${bankLedgers.length === 0 ? `
+                                     <tr>
+                                         <td colspan="4" class="p-6 text-center text-slate-400 font-sans">
+                                             <p class="font-medium text-slate-500 text-xs">No balance ledgers logged for ${getMonthName(selectedMonth)} yet.</p>
+                                             <p class="text-[10px] text-slate-400 mt-1">Update closing cash levels in the Banks tab to compile ledger shifts.</p>
+                                         </td>
+                                     </tr>
                                 ` : bankLedgers.map(item => {
                                     const netChange = parseFloat(item.closing_balance || 0) - parseFloat(item.opening_balance || 0);
 
@@ -382,7 +391,7 @@ export async function render(container, selectedMonth) {
 
                         <div class="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between">
                             <div>
-                                <span class="text-[10px] text-slate-405 uppercase font-bold tracking-wider">MoM Net savings rate</span>
+                                <span class="text-[10px] text-slate-405 uppercase font-bold tracking-wider">MoM Unallocated Cash</span>
                                 <div class="font-mono font-bold text-slate-800 text-sm mt-0.5">${formatCurrency(savings)}</div>
                             </div>
                             <span class="font-semibold text-xs px-2.5 py-1 rounded-full font-mono ${savPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">

@@ -73,8 +73,9 @@ export async function render(container, selectedMonth) {
         });
 
         // --- 2. CALCULATIONS PHASE ---
-        // Savings = Income − Expenses − Investment Contributions
+        // Savings (representing unallocated cash left) = Income − Expenses − Investment Contributions
         const savings = totalIncome - totalExpenses - totalContributions;
+        const savingsRate = totalIncome > 0 ? (((totalIncome - totalExpenses) / totalIncome) * 100) : 0;
 
         // Net Worth = Bank Closing Balances + Current Value of Active Investments
         const netWorth = totalBankCash + totalCurrentValueAllTime;
@@ -108,6 +109,32 @@ export async function render(container, selectedMonth) {
                         </div>
                     </div>
                 </div>
+
+                ${(totalIncome === 0 && totalExpenses === 0 && totalInvestedAllTime === 0) ? `
+                    <div class="bg-blue-50 border border-blue-200/60 rounded-2xl p-5 space-y-3.5 animate-fade-in select-none">
+                        <div class="flex items-center gap-2">
+                            <div class="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                                <i data-lucide="compass" class="w-4 h-4"></i>
+                            </div>
+                            <h3 class="text-sm font-bold text-blue-900">Welcome to Niva Personal Ledger!</h3>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed">Here is a quick checklist to configure your ledger profile and activate your live financial dashboard:</p>
+                        <ul class="space-y-2 text-[11px] text-slate-700 font-semibold">
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="check-square" class="w-3.5 h-3.5 text-blue-500"></i>
+                                <span>Define your cash accounts in the <button id="welcome-btn-banks" class="text-blue-600 font-bold hover:underline cursor-pointer">Banks</button> workspace.</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="check-square" class="w-3.5 h-3.5 text-blue-500"></i>
+                                <span>Log your starting monthly payout in the <button id="welcome-btn-income" class="text-blue-600 font-bold hover:underline cursor-pointer">Income</button> log.</span>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="check-square" class="w-3.5 h-3.5 text-blue-500"></i>
+                                <span>Record your active assets and portfolios in <button id="welcome-btn-investments" class="text-blue-600 font-bold hover:underline cursor-pointer">Investments</button>.</span>
+                            </li>
+                        </ul>
+                    </div>
+                ` : ''}
 
                 <!-- Card Orders - EXACTLY AS SPECIFIED -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -148,20 +175,20 @@ export async function render(container, selectedMonth) {
                         </div>
                     </div>
 
-                    <!-- 3. Savings -->
+                    <!-- 3. Unallocated Cash -->
                     <div id="card-monthly-savings" class="bento-card p-5 cursor-pointer border-l-4 border-l-amber-500 hover:shadow-lg transition-all">
                         <div class="flex justify-between items-start mb-2">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Savings</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unallocated Cash</span>
                             <div class="bg-amber-50 p-1.5 rounded-lg text-amber-600">
                                 <i data-lucide="shield" class="w-4 h-4"></i>
                             </div>
                         </div>
                         <div class="space-y-1">
-                            <span class="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold">Net Liquid Left:</span>
+                            <span class="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold">Cash left after investments:</span>
                             <div class="text-lg font-mono font-bold text-slate-900 leading-tight">${formatCurrency(savings)}</div>
                             <div class="text-[10px] text-amber-700 font-medium flex items-center gap-0.5 mt-2 pt-1.5 border-t border-slate-100">
                                 <span>Savings Rate:</span>
-                                <span>${totalIncome > 0 ? ((savings / totalIncome) * 100).toFixed(0) : '0'}%</span>
+                                <span>${savingsRate.toFixed(0)}%</span>
                             </div>
                         </div>
                     </div>
@@ -251,11 +278,11 @@ export async function render(container, selectedMonth) {
                                 <div class="p-2.5 rounded-xl border border-slate-50 bg-slate-50 flex items-center justify-between hover:bg-slate-100/50 cursor-pointer transition-all border-l-4 border-l-amber-500 group" data-slice="Savings">
                                     <div class="flex items-center gap-2">
                                         <div class="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>
-                                        <span class="text-xs font-semibold text-slate-650 group-hover:text-amber-750">Net Monthly Savings</span>
+                                        <span class="text-xs font-semibold text-slate-650 group-hover:text-amber-750">Unallocated Cash</span>
                                     </div>
                                     <div class="text-right">
                                         <div class="text-xs font-mono font-bold text-slate-800 group-hover:text-amber-750">${formatCurrency(savings)}</div>
-                                        <span class="text-[9px] font-mono text-slate-405">${totalIncome > 0 ? ((savings / totalIncome) * 100).toFixed(0) : '0'}%</span>
+                                        <span class="text-[9px] font-mono text-slate-405">${totalIncome > 0 ? ((savings / totalIncome) * 100).toFixed(0) : '0'}% of Income</span>
                                     </div>
                                 </div>
 
@@ -326,6 +353,20 @@ function setupDashboardListeners(I, E, C, S) {
     document.getElementById('card-monthly-savings').addEventListener('click', () => navigateTo('reports'));
     document.getElementById('card-monthly-expenses').addEventListener('click', () => navigateTo('expenses'));
 
+    // Welcome checklist triggers (if elements exist)
+    const welcomeBanks = document.getElementById('welcome-btn-banks');
+    if (welcomeBanks) {
+        welcomeBanks.addEventListener('click', () => navigateTo('banks'));
+    }
+    const welcomeIncome = document.getElementById('welcome-btn-income');
+    if (welcomeIncome) {
+        welcomeIncome.addEventListener('click', () => navigateTo('income'));
+    }
+    const welcomeInvestments = document.getElementById('welcome-btn-investments');
+    if (welcomeInvestments) {
+        welcomeInvestments.addEventListener('click', () => navigateTo('investments'));
+    }
+
     // Interactive slices
     const updateDonutText = (label, value) => {
         document.getElementById('donut-lbl').textContent = label;
@@ -333,7 +374,7 @@ function setupDashboardListeners(I, E, C, S) {
     };
 
     // Preset legend display values
-    updateDonutText("Net Savings", S);
+    updateDonutText("Unallocated Cash", S);
 
     // Attach interactions to SVG slices or legend divs
     document.querySelectorAll('[data-slice]').forEach(item => {
@@ -345,10 +386,10 @@ function setupDashboardListeners(I, E, C, S) {
             else if (label === 'Investments') val = C;
             else if (label === 'Savings') val = S;
 
-            updateDonutText(label, val);
+            updateDonutText(label === 'Savings' ? 'Unallocated Cash' : label, val);
         });
         item.addEventListener('mouseleave', () => {
-            updateDonutText("Net Savings", S);
+            updateDonutText("Unallocated Cash", S);
         });
     });
 }

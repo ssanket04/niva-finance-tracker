@@ -9,6 +9,10 @@ export function render(container, selectedMonth) {
                 <span class="text-xs uppercase font-semibold text-emerald-600 tracking-wider">COMPOUND CALCULATORS</span>
                 <h2 class="text-2xl font-bold tracking-tight text-slate-900">Future Wealth Projection</h2>
                 <p class="text-[10px] text-slate-400 mt-0.5">Simulate savings projections using local deterministic math matrices. No AI predictions model.</p>
+                <div class="mt-2.5 p-3 bg-slate-100 border border-slate-200/60 rounded-xl text-[10px] text-slate-500 leading-normal flex items-start gap-2">
+                    <i data-lucide="info" class="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5"></i>
+                    <span><b>Disclaimer:</b> Projections are simulated using local deterministic compounding formulas and do not constitute professional financial advice. Actual investment returns are subject to market risks. Calculations do not adjust for tax liabilities or inflation unless specified.</span>
+                </div>
             </div>
 
             <!-- Bento Calculators Grid Layout -->
@@ -231,7 +235,7 @@ function connectCalculatorTriggers() {
     };
 
     // 2. FD calculator formulas:
-    // Compound interest: A = P * (1 + r/100)^t
+    // Compound interest: A = P * (1 + r/400)^(4t) (Quarterly Compounding)
     const doFdCalc = () => {
         const p = parseFloat(document.getElementById('fd-principal').value || 0);
         const r = parseFloat(document.getElementById('fd-rate').value || 0);
@@ -239,7 +243,7 @@ function connectCalculatorTriggers() {
 
         let fv = 0;
         if (p > 0 && r > 0 && y > 0) {
-            fv = p * Math.pow(1 + r/100, y);
+            fv = p * Math.pow(1 + r/400, y * 4);
         }
         document.getElementById('fd-result-fv').textContent = formatCurrency(fv, 'INR');
     };
@@ -262,7 +266,7 @@ function connectCalculatorTriggers() {
     };
 
     // 4. Gold compounded growth
-    // Compound principal: A = P * (1 + r/100)^t
+    // Compound principal: A = P * (1 + r/100)^t + (P * 2.5% * t) guaranteed SGB simple interest payout
     const doGoldCalc = () => {
         const p = parseFloat(document.getElementById('gold-principal').value || 0);
         const r = parseFloat(document.getElementById('gold-rate').value || 0);
@@ -270,7 +274,8 @@ function connectCalculatorTriggers() {
 
         let fv = 0;
         if (p > 0 && r > 0 && y > 0) {
-            fv = p * Math.pow(1 + r/100, y);
+            const interestPayout = p * 0.025 * y;
+            fv = (p * Math.pow(1 + r/100, y)) + interestPayout;
         }
         document.getElementById('gold-result-fv').textContent = formatCurrency(fv, 'INR');
     };

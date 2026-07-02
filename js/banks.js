@@ -62,7 +62,8 @@ export async function render(container, selectedMonth) {
                     ${accounts.length === 0 ? `
                         <div class="bento-card p-8 text-center text-slate-400 md:col-span-3">
                             <i data-lucide="landmark" class="w-8 h-8 opacity-40 mx-auto mb-2"></i>
-                            No banking accounts structured yet. Click 'Manage Accounts' above to get started.
+                            <p class="font-medium text-slate-500 text-xs">No banking accounts structured yet.</p>
+                            <p class="text-[10px] text-slate-400 mt-1">Get started by clicking <b>'Manage Accounts'</b> above to set up your bank accounts.</p>
                         </div>
                     ` : accounts.map(acc => {
                         // Find matching balance record for this month
@@ -222,6 +223,11 @@ function openBalanceRecordModal(account, record, selectedMonth, openingVal, clos
             const opening = parseFloat(document.getElementById('bal-opening').value);
             const closing = parseFloat(document.getElementById('bal-closing').value);
             const note = document.getElementById('bal-note').value;
+
+            if (isNaN(opening) || opening < 0 || isNaN(closing) || closing < 0) {
+                alert("Balances must be valid non-negative numbers.");
+                return;
+            }
 
             showActionSpinner(true);
             try {

@@ -80,13 +80,14 @@ export async function render(container, selectedMonth) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-xs">
-                            ${entries.length === 0 ? `
-                                <tr>
-                                    <td colspan="5" class="p-8 text-center text-slate-400">
-                                        <i data-lucide="inbox" class="w-8 h-8 opacity-40 mx-auto mb-2"></i>
-                                        No income records entered for this month.
-                                    </td>
-                                </tr>
+                             ${entries.length === 0 ? `
+                                 <tr>
+                                     <td colspan="5" class="p-8 text-center text-slate-400">
+                                         <i data-lucide="inbox" class="w-8 h-8 opacity-40 mx-auto mb-2"></i>
+                                         <p class="font-medium text-slate-500 text-xs">No income records entered for this month.</p>
+                                         <p class="text-[10px] text-slate-400 mt-1">Get started by clicking <b>'Add Entry'</b> above to log your first income payout.</p>
+                                     </td>
+                                 </tr>
                             ` : entries.map(entry => `
                                 <tr class="hover:bg-slate-50/50 transition-all">
                                     <td class="p-4 font-semibold text-slate-800">
@@ -228,8 +229,17 @@ function openEntryModal(entry, sources, selectedMonth) {
             const amount = parseFloat(document.getElementById('entry-amount').value);
             const note = document.getElementById('entry-note').value;
 
+            if (isNaN(amount) || amount <= 0) {
+                alert("Please enter a valid amount greater than zero.");
+                return;
+            }
+
             // Automatically extract YYYY-MM from credit date to maintain index query speed
             const entryMonth = date.substring(0, 7);
+            if (entryMonth !== selectedMonth) {
+                const proceed = confirm(`The date entered (${date}) is in a different month than the active view (${selectedMonth}). Do you wish to save it anyway?`);
+                if (!proceed) return;
+            }
 
             showActionSpinner(true);
             try {

@@ -148,13 +148,14 @@ export async function render(container, selectedMonth) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-xs">
-                            ${entries.length === 0 ? `
-                                <tr>
-                                    <td colspan="5" class="p-8 text-center text-slate-400">
-                                        <i data-lucide="inbox" class="w-8 h-8 opacity-40 mx-auto mb-2"></i>
-                                        No expense entries logged for this month.
-                                    </td>
-                                </tr>
+                             ${entries.length === 0 ? `
+                                 <tr>
+                                     <td colspan="5" class="p-8 text-center text-slate-400">
+                                         <i data-lucide="inbox" class="w-8 h-8 opacity-40 mx-auto mb-2"></i>
+                                         <p class="font-medium text-slate-500 text-xs">No expense entries logged for this month.</p>
+                                         <p class="text-[10px] text-slate-400 mt-1">Click <b>'Add Entry'</b> to record your first expense or <b>'Import CSV'</b> to upload bank statements.</p>
+                                     </td>
+                                 </tr>
                             ` : entries.map(entry => `
                                 <tr class="hover:bg-slate-50/50 transition-all expense-row-element" data-cat-id="${entry.category_id}" data-text-note="${escapeHTML((entry.note || '').toLowerCase())}" data-text-amount="${entry.amount}">
                                     <td class="p-4 font-semibold text-slate-800">
@@ -346,8 +347,17 @@ function openExpenseModal(entry, categories, selectedMonth) {
             const amount = parseFloat(document.getElementById('exp-amount').value);
             const note = document.getElementById('exp-note').value;
 
+            if (isNaN(amount) || amount <= 0) {
+                alert("Please enter a valid amount greater than zero.");
+                return;
+            }
+
             // Compute month index
             const entryMonth = date.substring(0, 7);
+            if (entryMonth !== selectedMonth) {
+                const proceed = confirm(`The date entered (${date}) is in a different month than the active view (${selectedMonth}). Do you wish to save it anyway?`);
+                if (!proceed) return;
+            }
 
             showActionSpinner(true);
             try {

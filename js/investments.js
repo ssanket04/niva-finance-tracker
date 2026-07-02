@@ -108,7 +108,7 @@ export async function render(container, selectedMonth) {
                             <i data-lucide="settings" class="w-3.5 h-3.5"></i> Categories
                         </button>
                         <button id="btn-add-holding" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/15 cursor-pointer">
-                            <i data-lucide="plus" class="w-4 h-4"></i> Create Holding
+                            <i data-lucide="plus" class="w-4 h-4"></i> Add Investment
                         </button>
                     </div>
                 </div>
@@ -209,7 +209,13 @@ export async function render(container, selectedMonth) {
                     <h3 class="font-bold text-slate-900 text-base">Active Assets Ledger</h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        ${categories.map(cat => {
+                        ${activeHoldings.length === 0 ? `
+                            <div class="bento-card p-8 text-center text-slate-400 md:col-span-2">
+                                <i data-lucide="piggy-bank" class="w-8 h-8 opacity-40 mx-auto mb-2"></i>
+                                <p class="font-medium text-slate-500 text-xs">No active asset holdings.</p>
+                                <p class="text-[10px] text-slate-400 mt-1">Get started by clicking <b>'Add Investment'</b> above to log your first Mutual Fund, Stock, FD, SGB, or other assets.</p>
+                            </div>
+                        ` : categories.map(cat => {
                             const catHoldings = activeHoldings.filter(h => h.category_id === cat.id);
                             if (catHoldings.length === 0) return ''; // Empty categories hidden for clean bento
 
@@ -406,7 +412,7 @@ function openHoldingModal(categories) {
     const html = `
         <div>
             <h3 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 mb-1">
-                <i data-lucide="piggy-bank" class="text-emerald-600"></i> New Asset Holding
+                <i data-lucide="piggy-bank" class="text-emerald-600"></i> New Investment Asset
             </h3>
             <p class="text-slate-500 text-xs mb-5">Fields adjust automatically based on the category you select.</p>
 
@@ -612,8 +618,13 @@ function openHoldingModal(categories) {
             const assetType = getAssetType(catName);
             const currency = assetType === 'us_fund' ? 'USD' : 'INR';
 
-            const currentVal = parseFloat(document.getElementById('hold-current').value) || 0;
+            const currentVal = parseFloat(document.getElementById('hold-current').value);
             const notes = document.getElementById('hold-notes').value;
+
+            if (isNaN(currentVal) || currentVal < 0) {
+                alert('Current value must be a valid non-negative number.');
+                return;
+            }
 
             // Derive name, invested, and extra fields based on asset type
             let holdingName = '';
@@ -651,6 +662,16 @@ function openHoldingModal(categories) {
                 // Recurring: mutual fund, liquid, pf, us_fund
                 holdingName = document.getElementById('hold-name').value;
                 monthlySip = parseFloat(document.getElementById('hold-sip').value) || 0;
+            }
+
+            if (isNaN(investedAmt) || investedAmt < 0) {
+                alert('Invested amount must be a valid non-negative number.');
+                return;
+            }
+
+            if (isNaN(monthlySip) || monthlySip < 0) {
+                alert('SIP contribution amount must be a valid non-negative number.');
+                return;
             }
 
             if (!holdingName.trim()) {

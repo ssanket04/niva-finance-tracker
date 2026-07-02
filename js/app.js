@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabase.js';
+import { supabase, isSupabaseConfigured, saveSupabaseConfig, isConfiguredViaEnv } from './supabase.js';
 import { getMonthName, getPrevMonth, getNextMonth, escapeHTML } from './utils.js';
 
 // App state
@@ -153,6 +153,16 @@ export async function navigateTo(viewName) {
     if (!currentUser) return;
     
     currentView = viewName;
+
+    // Toggle Month Ribbon visibility based on tab scoping
+    const monthRibbon = document.getElementById('month-navigation-ribbon');
+    if (monthRibbon) {
+        if (viewName === 'investments' || viewName === 'future-wealth') {
+            monthRibbon.classList.add('hidden');
+        } else {
+            monthRibbon.classList.remove('hidden');
+        }
+    }
     
     // Highlight Active Bottom Nav Button
     document.querySelectorAll('#bottom-navigation-bar button').forEach(btn => {
@@ -238,6 +248,13 @@ export async function reFetchAndRenderCurrentView() {
 function setupCredentialsOverlay() {
     const isConfig = isSupabaseConfigured();
     showSetupOverlay(!isConfig);
+
+    if (isConfiguredViaEnv) {
+        const reconnectBtn = document.getElementById('btn-reconnect-db');
+        if (reconnectBtn) {
+            reconnectBtn.classList.add('hidden');
+        }
+    }
 
     document.getElementById('setup-form').addEventListener('submit', (e) => {
         e.preventDefault();
@@ -328,8 +345,8 @@ async function checkSalaryBanner() {
 
         if (error) throw error;
 
-        // Is there any entry logged under 'Salary' source?
-        const hasSalary = salaryEntries.some(entry => entry.income_sources?.name === 'Salary');
+        // Is there any entry logged under 'Salary' source (case-insensitive)?
+        const hasSalary = salaryEntries.some(entry => entry.income_sources?.name?.toLowerCase().includes('salary'));
 
         if (!hasSalary) {
             // Find last month's salary entry
@@ -346,7 +363,7 @@ async function checkSalaryBanner() {
                 .eq('user_id', currentUser.id)
                 .eq('month', prevMonth);
 
-            const lastMonthSalary = prevSalaryEntries?.find(entry => entry.income_sources?.name === 'Salary');
+            const lastMonthSalary = prevSalaryEntries?.find(entry => entry.income_sources?.name?.toLowerCase().includes('salary'));
 
             if (lastMonthSalary) {
                 // Precompile draft click action

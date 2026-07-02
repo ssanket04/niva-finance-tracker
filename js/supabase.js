@@ -11,6 +11,8 @@ export function isSupabaseConfigured() {
     return !!(supabaseUrl && supabaseAnonKey);
 }
 
+export const isConfiguredViaEnv = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+
 if (isSupabaseConfigured()) {
     try {
         supabase = createClient(supabaseUrl, supabaseAnonKey);
