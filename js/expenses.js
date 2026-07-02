@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js';
 import { currentUser, reFetchAndRenderCurrentView, showModal, closeModal, showActionSpinner } from './app.js';
 import { formatCurrency, escapeHTML } from './utils.js';
+import { NaiveBayesClassifier } from './classifier.js';
 
 export async function render(container, selectedMonth) {
     if (!currentUser) return;
@@ -9,7 +10,8 @@ export async function render(container, selectedMonth) {
         // --- 1. DATA RE-FETCH PHASE ---
         const [
             { data: categories, error: cErr },
-            { data: entries, error: eErr }
+            { data: entries, error: eErr },
+            { data: trainingData }
         ] = await Promise.all([
             supabase
                 .from('expense_categories')
@@ -28,12 +30,28 @@ export async function render(container, selectedMonth) {
                 `)
                 .eq('user_id', currentUser.id)
                 .eq('month', selectedMonth)
+                .order('date', { ascending: false }),
+            supabase
+                .from('expense_entries')
+                .select('note, category_id, amount')
+                .eq('user_id', currentUser.id)
                 .order('date', { ascending: false })
+                .limit(200)
         ]);
         if (cErr) throw cErr;
         if (eErr) throw eErr;
 
         const totalExpenses = entries.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+
+        // Train Naive Bayes Categorizer on historical transactions
+        const classifier = new NaiveBayesClassifier();
+        if (trainingData) {
+            trainingData.forEach(e => {
+                if (e.note && e.category_id) {
+                    classifier.train(e.note, e.category_id);
+                }
+            });
+        }
 
         // --- 2. RENDER THE INTERACTIVE WORKSPACE ---
         container.innerHTML = `
@@ -183,7 +201,22 @@ export async function render(container, selectedMonth) {
             </div>
         `;
 
-        setupExpensesListeners(categories, entries, selectedMonth);
+        setupExpensesListeners(categories, entries, selectedMonth, classifier, trainingData);
+
+        // Check for global prefilled voice transactions
+        if (window.prefilledVoiceTransaction && window.prefilledVoiceTransaction.type === 'expense') {
+            const voiceData = window.prefilledVoiceTransaction;
+            window.prefilledVoiceTransaction = null; // Clear immediately
+
+            const matchingCat = categories.find(c => c.name.toLowerCase().includes(voiceData.category_name?.toLowerCase() || '')) || categories[0];
+            const prefilledEntry = {
+                amount: voiceData.amount,
+                note: voiceData.note,
+                date: voiceData.date,
+                category_id: matchingCat ? matchingCat.id : null
+            };
+            setTimeout(() => openExpenseModal(prefilledEntry, categories, selectedMonth, classifier, trainingData), 100);
+        }
 
     } catch (e) {
         console.error("Expenses view render failure:", e);
@@ -194,10 +227,10 @@ export async function render(container, selectedMonth) {
 /**
  * Event triggers of expense list and breakdown drawers
  */
-function setupExpensesListeners(categories, entries, selectedMonth) {
+function setupExpensesListeners(categories, entries, selectedMonth, classifier, trainingData) {
     // 1. ADD MODAL TRIGGER
     document.getElementById('btn-add-expense').addEventListener('click', () => {
-        openExpenseModal(null, categories, selectedMonth);
+        openExpenseModal(null, categories, selectedMonth, classifier, trainingData);
     });
 
     // 2. MANAGE CATEGORIES TRIGGER
@@ -262,7 +295,7 @@ function setupExpensesListeners(categories, entries, selectedMonth) {
         btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-edit-expense-id');
             const entry = entries.find(e => e.id === id);
-            openExpenseModal(entry, categories, selectedMonth);
+            openExpenseModal(entry, categories, selectedMonth, classifier, trainingData);
         });
     });
 
@@ -291,7 +324,7 @@ function setupExpensesListeners(categories, entries, selectedMonth) {
 /**
  * Add / Edit Expense entry modals
  */
-function openExpenseModal(entry, categories, selectedMonth) {
+function openExpenseModal(entry, categories, selectedMonth, classifier, trainingData) {
     const isEdit = !!entry;
     const catOptionsHTML = categories.map(c => {
         const sel = isEdit && entry.category_id === c.id ? 'selected' : '';
@@ -324,7 +357,12 @@ function openExpenseModal(entry, categories, selectedMonth) {
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Observation Memo / Note</label>
-                    <input type="text" id="exp-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Groceries purchases, uber ride to station" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    <div class="relative flex items-center">
+                        <input type="text" id="exp-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Groceries purchases, uber ride to station" class="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                        <button type="button" id="btn-voice-dictate" class="absolute right-1.5 p-1 text-slate-400 hover:text-rose-500 transition-all rounded cursor-pointer" title="Voice Dictate">
+                            <i data-lucide="mic" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
@@ -359,6 +397,22 @@ function openExpenseModal(entry, categories, selectedMonth) {
                 if (!proceed) return;
             }
 
+            // Spending Anomaly Checker (2.5 standard deviations)
+            if (trainingData && trainingData.length > 0) {
+                const categoryData = trainingData.filter(e => e.category_id === categoryId && e.amount);
+                if (categoryData.length >= 3) {
+                    const amounts = categoryData.map(e => parseFloat(e.amount));
+                    const mean = amounts.reduce((sum, val) => sum + val, 0) / amounts.length;
+                    const variance = amounts.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / amounts.length;
+                    const stdDev = Math.sqrt(variance);
+
+                    if (stdDev > 0 && amount > mean + (2.5 * stdDev)) {
+                        const proceed = confirm(`Warning: The amount logged (₹${amount}) deviates significantly from your category average (Mean: ₹${mean.toFixed(0)}, StdDev: ₹${stdDev.toFixed(0)}). Is this correct?`);
+                        if (!proceed) return;
+                    }
+                }
+            }
+
             showActionSpinner(true);
             try {
                 if (isEdit) {
@@ -389,6 +443,67 @@ function openExpenseModal(entry, categories, selectedMonth) {
                 showActionSpinner(false);
             }
         });
+
+        // Setup AI Autocomplete & Voice dictation listeners
+        const expNoteInput = document.getElementById('exp-note');
+        const expCatSelect = document.getElementById('exp-cat-id');
+
+        let userManuallyChangedCategory = false;
+        expCatSelect.addEventListener('change', () => {
+            userManuallyChangedCategory = true;
+        });
+
+        if (classifier && !isEdit) {
+            expNoteInput.addEventListener('input', () => {
+                if (userManuallyChangedCategory) return;
+                const predictedCat = classifier.predict(expNoteInput.value);
+                if (predictedCat) {
+                    expCatSelect.value = predictedCat;
+                }
+            });
+        }
+
+        // Voice dictation setup
+        const voiceBtn = document.getElementById('btn-voice-dictate');
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-IN'; // Hinglish / English accent
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                voiceBtn.classList.add('text-rose-500', 'animate-pulse');
+                expNoteInput.placeholder = "Listening...";
+            };
+
+            recognition.onerror = (err) => {
+                console.error("Speech Recognition error:", err);
+                voiceBtn.classList.remove('text-rose-500', 'animate-pulse');
+                expNoteInput.placeholder = "E.g., Groceries purchases, uber ride to station";
+            };
+
+            recognition.onend = () => {
+                voiceBtn.classList.remove('text-rose-500', 'animate-pulse');
+                expNoteInput.placeholder = "E.g., Groceries purchases, uber ride to station";
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                expNoteInput.value = transcript;
+                expNoteInput.dispatchEvent(new Event('input')); // trigger predictor
+            };
+
+            voiceBtn.addEventListener('click', () => {
+                recognition.start();
+            });
+        } else {
+            voiceBtn.style.display = 'none';
+        }
+        
+        // Refresh icons inside modal
+        if (window.lucide) window.lucide.createIcons();
     });
 }
 
