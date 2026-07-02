@@ -1,7 +1,15 @@
--- Personal Finance Tracker Database Schema
--- Run this in your Supabase SQL Editor
+-- =========================================================================
+-- NIVA FINANCE TRACKER — FINAL PRODUCTION SCHEMA
+-- Use this script to set up a fresh database on Supabase from scratch.
+-- Includes tables, constraints, indices, triggers, RLS policies, and seed handlers.
+-- =========================================================================
 
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =========================================================================
 -- 1. INCOME SOURCES
+-- =========================================================================
 CREATE TABLE public.income_sources (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -14,7 +22,9 @@ ALTER TABLE public.income_sources ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Manage own income sources" ON public.income_sources
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+-- =========================================================================
 -- 2. INCOME ENTRIES
+-- =========================================================================
 CREATE TABLE public.income_entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -32,7 +42,9 @@ CREATE POLICY "Manage own income entries" ON public.income_entries
 
 CREATE INDEX idx_income_entries_user_month ON public.income_entries(user_id, month);
 
+-- =========================================================================
 -- 3. BANK ACCOUNTS
+-- =========================================================================
 CREATE TABLE public.bank_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -46,7 +58,9 @@ ALTER TABLE public.bank_accounts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Manage own bank accounts" ON public.bank_accounts
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- 4. BANK BALANCES (Per month opening/closing tracking)
+-- =========================================================================
+-- 4. BANK MONTHLY BALANCES
+-- =========================================================================
 CREATE TABLE public.bank_balances (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -65,7 +79,9 @@ CREATE POLICY "Manage own bank balances" ON public.bank_balances
 
 CREATE INDEX idx_bank_balances_user_month ON public.bank_balances(user_id, month);
 
+-- =========================================================================
 -- 5. INVESTMENT CATEGORIES
+-- =========================================================================
 CREATE TABLE public.investment_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -79,12 +95,15 @@ ALTER TABLE public.investment_categories ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Manage own investment categories" ON public.investment_categories
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+-- =========================================================================
 -- 6. HOLDINGS (Manual assets and SIPs)
+-- =========================================================================
 CREATE TABLE public.holdings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     category_id UUID NOT NULL REFERENCES public.investment_categories(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
+    asset_type TEXT NOT NULL DEFAULT 'mutual_fund', -- e.g. fd, stock, gold, us_fund, mutual_fund, liquid_fund, pf, custom
     is_recurring BOOLEAN NOT NULL DEFAULT false,
     monthly_contribution NUMERIC NOT NULL DEFAULT 0, -- Set if recurring (SIP)
     current_value NUMERIC NOT NULL DEFAULT 0, -- User editable
@@ -94,6 +113,7 @@ CREATE TABLE public.holdings (
     interest_rate NUMERIC, -- FD %, e.g., 7.1
     start_date DATE,
     maturity_date DATE,
+    fd_bank_name TEXT, -- FD bank name
     -- Closure fields
     is_closed BOOLEAN NOT NULL DEFAULT false,
     closure_value NUMERIC,
@@ -107,7 +127,9 @@ ALTER TABLE public.holdings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Manage own holdings" ON public.holdings
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+-- =========================================================================
 -- 7. INVESTMENT CONTRIBUTIONS (History of contributions for recurring holdings)
+-- =========================================================================
 CREATE TABLE public.investment_contributions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -125,7 +147,9 @@ CREATE POLICY "Manage own investment contributions" ON public.investment_contrib
 
 CREATE INDEX idx_investment_contributions_user_month ON public.investment_contributions(user_id, month);
 
+-- =========================================================================
 -- 8. INVESTMENT WITHDRAWALS
+-- =========================================================================
 CREATE TABLE public.investment_withdrawals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -140,7 +164,9 @@ ALTER TABLE public.investment_withdrawals ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Manage own investment withdrawals" ON public.investment_withdrawals
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+-- =========================================================================
 -- 9. EXPENSE CATEGORIES
+-- =========================================================================
 CREATE TABLE public.expense_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -153,7 +179,9 @@ ALTER TABLE public.expense_categories ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Manage own expense categories" ON public.expense_categories
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+-- =========================================================================
 -- 10. EXPENSE ENTRIES
+-- =========================================================================
 CREATE TABLE public.expense_entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -173,12 +201,46 @@ CREATE INDEX idx_expense_entries_user_month ON public.expense_entries(user_id, m
 
 
 -- =========================================================================
+-- TRIGGERS FOR Month AUTO-DERIVATION (Data Integrity)
+-- Auto-derives YYYY-MM values from input dates to prevent data mismatch.
+-- =========================================================================
+
+-- 1. Income Entries Trigger
+CREATE OR REPLACE FUNCTION set_income_month()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.month := to_char(NEW.date_credited, 'YYYY-MM');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_income_month ON public.income_entries;
+CREATE TRIGGER trg_income_month
+  BEFORE INSERT OR UPDATE ON public.income_entries
+  FOR EACH ROW EXECUTE FUNCTION set_income_month();
+
+-- 2. Expense Entries Trigger
+CREATE OR REPLACE FUNCTION set_expense_month()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.month := to_char(NEW.date, 'YYYY-MM');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_expense_month ON public.expense_entries;
+CREATE TRIGGER trg_expense_month
+  BEFORE INSERT OR UPDATE ON public.expense_entries
+  FOR EACH ROW EXECUTE FUNCTION set_expense_month();
+
+
+-- =========================================================================
 -- AUTOMATIC SEEDING ON USER REGISTRATION
 -- This function and trigger automatically seed a new user with the default:
 -- - Income sources (Salary, Bonus, Other)
 -- - Bank accounts (HDFC, IDFC, SBI)
 -- - Expense categories (Travel, Trips / Outings, Shopping, Miscellaneous)
--- - Investment categories (Mutual Funds, US Funds, Liquid Funds, PF, Gold (SGB), Fixed Deposits)
+-- - Investment categories (Mutual Funds, US Funds, Liquid Funds, PF, Gold (SGB), Fixed Deposits, Stocks, Other Assets)
 -- =========================================================================
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -213,7 +275,9 @@ BEGIN
         (new.id, 'Liquid Funds', true),
         (new.id, 'PF', true),
         (new.id, 'Gold (SGB)', false),
-        (new.id, 'Fixed Deposits', false)
+        (new.id, 'Fixed Deposits', false),
+        (new.id, 'Stocks', false),
+        (new.id, 'Other Assets', false)
     ON CONFLICT (user_id, name) DO NOTHING;
 
     RETURN new;
@@ -221,6 +285,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create the trigger on auth.users (runs post-signup)
-CREATE OR REPLACE TRIGGER on_auth_user_created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

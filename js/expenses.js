@@ -1,34 +1,36 @@
 import { supabase } from './supabase.js';
 import { currentUser, reFetchAndRenderCurrentView, showModal, closeModal, showActionSpinner } from './app.js';
-import { formatCurrency } from './utils.js';
+import { formatCurrency, escapeHTML } from './utils.js';
 
 export async function render(container, selectedMonth) {
     if (!currentUser) return;
 
     try {
         // --- 1. DATA RE-FETCH PHASE ---
-        // A. Fetch Expense Categories
-        const { data: categories, error: cErr } = await supabase
-            .from('expense_categories')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('name', { ascending: true });
+        const [
+            { data: categories, error: cErr },
+            { data: entries, error: eErr }
+        ] = await Promise.all([
+            supabase
+                .from('expense_categories')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('name', { ascending: true }),
+            supabase
+                .from('expense_entries')
+                .select(`
+                    id,
+                    amount,
+                    date,
+                    note,
+                    category_id,
+                    expense_categories (name)
+                `)
+                .eq('user_id', currentUser.id)
+                .eq('month', selectedMonth)
+                .order('date', { ascending: false })
+        ]);
         if (cErr) throw cErr;
-
-        // B. Fetch Expense Entries for selected month
-        const { data: entries, error: eErr } = await supabase
-            .from('expense_entries')
-            .select(`
-                id,
-                amount,
-                date,
-                note,
-                category_id,
-                expense_categories (name)
-            `)
-            .eq('user_id', currentUser.id)
-            .eq('month', selectedMonth)
-            .order('date', { ascending: false });
         if (eErr) throw eErr;
 
         const totalExpenses = entries.reduce((sum, item) => sum + parseFloat(item.amount), 0);
@@ -83,7 +85,7 @@ export async function render(container, selectedMonth) {
                     <div>
                         <select id="expense-filter-cat" class="w-full px-3 py-2 bg-white border border-slate-200 outline-none rounded-xl focus:border-emerald-500 text-xs text-slate-700 font-medium font-sans">
                             <option value="ALL">All Categories</option>
-                            ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                            ${categories.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('')}
                         </select>
                     </div>
                 </div>
@@ -101,7 +103,7 @@ export async function render(container, selectedMonth) {
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center gap-2">
                                             <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 transition-all transform shrink-0" data-arrow-id="${cat.id}"></i>
-                                            <span class="font-bold text-slate-800 text-xs">${cat.name}</span>
+                                            <span class="font-bold text-slate-800 text-xs">${escapeHTML(cat.name)}</span>
                                         </div>
                                         <div class="text-right">
                                             <div class="font-mono font-bold text-slate-905 text-xs">${formatCurrency(catTotal)}</div>
@@ -116,7 +118,7 @@ export async function render(container, selectedMonth) {
                                         ` : catEntries.map(e => `
                                             <div class="flex justify-between items-center text-slate-650 bg-slate-50 p-2 rounded-lg border border-slate-100">
                                                 <div>
-                                                    <span class="font-medium text-slate-800">${e.note || 'No note'}</span>
+                                                    <span class="font-medium text-slate-800">${escapeHTML(e.note || 'No note')}</span>
                                                     <span class="block text-[9px] font-mono text-slate-400">${e.date}</span>
                                                 </div>
                                                 <div class="font-mono font-bold text-slate-800">${formatCurrency(e.amount)}</div>
@@ -154,14 +156,14 @@ export async function render(container, selectedMonth) {
                                     </td>
                                 </tr>
                             ` : entries.map(entry => `
-                                <tr class="hover:bg-slate-50/50 transition-all expense-row-element" data-cat-id="${entry.category_id}" data-text-note="${(entry.note || '').toLowerCase()}" data-text-amount="${entry.amount}">
+                                <tr class="hover:bg-slate-50/50 transition-all expense-row-element" data-cat-id="${entry.category_id}" data-text-note="${escapeHTML((entry.note || '').toLowerCase())}" data-text-amount="${entry.amount}">
                                     <td class="p-4 font-semibold text-slate-800">
-                                        ${entry.expense_categories?.name || 'Uncategorized'}
+                                        ${escapeHTML(entry.expense_categories?.name || 'Uncategorized')}
                                         <span class="block sm:hidden text-[10px] font-mono text-slate-400 leading-none mt-1">${entry.date}</span>
                                     </td>
                                     <td class="p-4 font-mono font-bold text-rose-600">${formatCurrency(entry.amount)}</td>
                                     <td class="p-4 font-mono text-slate-505 hidden sm:table-cell">${entry.date}</td>
-                                    <td class="p-4 text-slate-400 hidden md:table-cell max-w-[220px] truncate" title="${entry.note || ''}">${entry.note || '—'}</td>
+                                    <td class="p-4 text-slate-400 hidden md:table-cell max-w-[220px] truncate" title="${escapeHTML(entry.note || '')}">${escapeHTML(entry.note || '—')}</td>
                                     <td class="p-4 text-right">
                                         <div class="inline-flex items-center gap-1">
                                             <button data-edit-expense-id="${entry.id}" class="p-1 text-slate-400 hover:text-emerald-600 rounded hover:bg-slate-100 cursor-pointer">
@@ -292,7 +294,7 @@ function openExpenseModal(entry, categories, selectedMonth) {
     const isEdit = !!entry;
     const catOptionsHTML = categories.map(c => {
         const sel = isEdit && entry.category_id === c.id ? 'selected' : '';
-        return `<option value="${c.id}" ${sel}>${c.name}</option>`;
+        return `<option value="${c.id}" ${sel}>${escapeHTML(c.name)}</option>`;
     }).join('');
 
     const defaultDate = isEdit ? entry.date : `${selectedMonth}-01`;
@@ -321,7 +323,7 @@ function openExpenseModal(entry, categories, selectedMonth) {
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Observation Memo / Note</label>
-                    <input type="text" id="exp-note" value="${isEdit ? (entry.note || '') : ''}" placeholder="E.g., Groceries purchases, uber ride to station" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    <input type="text" id="exp-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Groceries purchases, uber ride to station" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
@@ -649,7 +651,7 @@ function openCategoriesModal(categories) {
                     <p class="p-4 text-center text-slate-400 text-xs">No custom categories established yet.</p>
                 ` : categories.map(c => `
                     <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 transition-all text-xs">
-                        <input type="text" value="${c.name}" data-item-cat-id="${c.id}" class="font-bold text-slate-800 bg-transparent border-b border-transparent focus:border-rose-500 outline-none pb-0.5" />
+                        <input type="text" value="${escapeHTML(c.name)}" data-item-cat-id="${c.id}" class="font-bold text-slate-800 bg-transparent border-b border-transparent focus:border-rose-500 outline-none pb-0.5" />
                         <div class="flex items-center gap-1.5">
                             <button data-save-exp-cat="${c.id}" class="text-emerald-600 hover:text-emerald-700 font-semibold text-[11px] h-6 px-1 cursor-pointer">Save</button>
                             <button data-del-exp-cat="${c.id}" class="text-slate-400 hover:text-red-500 p-1 cursor-pointer">

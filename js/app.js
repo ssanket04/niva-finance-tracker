@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabase.js';
-import { getMonthName, getPrevMonth, getNextMonth } from './utils.js';
+import { getMonthName, getPrevMonth, getNextMonth, escapeHTML } from './utils.js';
 
 // App state
 export let currentUser = null;
@@ -359,7 +359,7 @@ async function checkSalaryBanner() {
                         </div>
                         <div>
                             <p class="text-xs font-semibold text-amber-900">Salary Entry Missing</p>
-                            <p class="text-[10px] text-amber-705">Salary is not logged for ${getMonthName(selectedMonth)}. Would you like to copy last month's salary input of <b>₹${lastMonthSalary.amount.toLocaleString('en-IN')}</b> as a draft?</p>
+                            <p class="text-[10px] text-amber-705">Salary is not logged for ${getMonthName(selectedMonth)}. Would you like to copy last month's salary input of <b>₹${escapeHTML(lastMonthSalary.amount.toLocaleString('en-IN'))}</b> as a draft?</p>
                         </div>
                     </div>
                     <button id="btn-copy-salary-banner" class="shrink-0 bg-amber-600 hover:bg-amber-700 text-white rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all shadow-md shadow-amber-600/10 cursor-pointer">
@@ -411,7 +411,7 @@ function triggerSalaryDraftCreator(lastMonthSalary) {
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Note (Optional)</label>
-                    <input type="text" id="draft-salary-note" placeholder="Write observation notes here" value="${lastMonthSalary.note || ''}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-blue-500 text-xs" />
+                    <input type="text" id="draft-salary-note" placeholder="Write observation notes here" value="${escapeHTML(lastMonthSalary.note || '')}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-blue-500 text-xs" />
                 </div>
                 <div class="grid grid-cols-2 gap-3 pt-2">
                     <button type="button" id="btn-cancel-draft-modal" class="py-2 border border-slate-200 text-slate-600 font-medium rounded-lg text-xs hover:bg-slate-50 transition-all">Cancel</button>
@@ -475,7 +475,7 @@ function renderAuthScreen(customErrorMsg = "") {
 
             ${customErrorMsg ? `
                 <div class="bg-red-50 border border-red-100 rounded-xl p-3 text-center mb-4">
-                    <p class="text-xs text-red-600 font-semibold">${customErrorMsg}</p>
+                    <p class="text-xs text-red-600 font-semibold">${escapeHTML(customErrorMsg)}</p>
                 </div>
             ` : ''}
 

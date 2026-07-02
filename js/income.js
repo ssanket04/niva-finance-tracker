@@ -1,34 +1,32 @@
 import { supabase } from './supabase.js';
 import { currentUser, reFetchAndRenderCurrentView, showModal, closeModal, showActionSpinner } from './app.js';
-import { formatCurrency } from './utils.js';
+import { formatCurrency, escapeHTML } from './utils.js';
 
 export async function render(container, selectedMonth) {
     if (!currentUser) return;
 
     try {
-        // --- 1. DATA RE-FETCH PHASE ---
-        // Fetch Income Sources
-        const { data: sources, error: sErr } = await supabase
-            .from('income_sources')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('name', { ascending: true });
-        if (sErr) throw sErr;
-
-        // Fetch Income Entries for selected month
-        const { data: entries, error: eErr } = await supabase
-            .from('income_entries')
-            .select(`
+        // --- 1. DATA RE-FETCH PHASE — Fetch in parallel ---
+        const [
+            { data: sources, error: sErr },
+            { data: entries, error: eErr }
+        ] = await Promise.all([
+            // A. Fetch Income Sources
+            supabase.from('income_sources').select('*')
+                .eq('user_id', currentUser.id).order('name', { ascending: true }),
+            // B. Fetch Income Entries for selected month
+            supabase.from('income_entries').select(`
                 id,
                 amount,
                 date_credited,
                 note,
                 source_id,
                 income_sources (name)
-            `)
-            .eq('user_id', currentUser.id)
-            .eq('month', selectedMonth)
-            .order('date_credited', { ascending: false });
+            `).eq('user_id', currentUser.id).eq('month', selectedMonth)
+              .order('date_credited', { ascending: false })
+        ]);
+
+        if (sErr) throw sErr;
         if (eErr) throw eErr;
 
         const totalIncome = entries.reduce((sum, item) => sum + parseFloat(item.amount), 0);
@@ -92,12 +90,12 @@ export async function render(container, selectedMonth) {
                             ` : entries.map(entry => `
                                 <tr class="hover:bg-slate-50/50 transition-all">
                                     <td class="p-4 font-semibold text-slate-800">
-                                        ${entry.income_sources?.name || 'Unassigned Source'}
+                                        ${escapeHTML(entry.income_sources?.name || 'Unassigned Source')}
                                         <span class="block sm:hidden text-[10px] font-mono text-slate-400 leading-none mt-1">${entry.date_credited}</span>
                                     </td>
                                     <td class="p-4 font-mono font-bold text-emerald-600">${formatCurrency(entry.amount)}</td>
                                     <td class="p-4 font-mono text-slate-500 hidden sm:table-cell">${entry.date_credited}</td>
-                                    <td class="p-4 text-slate-400 hidden md:table-cell max-w-[200px] truncate" title="${entry.note || ''}">${entry.note || '—'}</td>
+                                    <td class="p-4 text-slate-400 hidden md:table-cell max-w-[200px] truncate" title="${escapeHTML(entry.note || '')}">${escapeHTML(entry.note || '—')}</td>
                                     <td class="p-4 text-right">
                                         <div class="inline-flex items-center gap-1">
                                             <button data-edit-id="${entry.id}" class="p-1 text-slate-400 hover:text-emerald-600 rounded hover:bg-slate-100 cursor-pointer">
@@ -179,7 +177,7 @@ function openEntryModal(entry, sources, selectedMonth) {
     // Choose selected option for dropdown
     const sourceSelectHTML = sources.map(src => {
         const sel = isEdit && entry.source_id === src.id ? 'selected' : '';
-        return `<option value="${src.id}" ${sel}>${src.name}</option>`;
+        return `<option value="${src.id}" ${sel}>${escapeHTML(src.name)}</option>`;
     }).join('');
 
     const defaultDate = isEdit ? entry.date_credited : `${selectedMonth}-01`;
@@ -208,7 +206,7 @@ function openEntryModal(entry, sources, selectedMonth) {
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Note (Optional)</label>
-                    <input type="text" id="entry-note" value="${isEdit ? (entry.note || '') : ''}" placeholder="E.g., Client payout, side job salary" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
+                    <input type="text" id="entry-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Client payout, side job salary" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
                 </div>
                 <div class="grid grid-cols-2 gap-3 pt-2">
                     <button type="button" id="btn-cancel-modal" class="py-2 border border-slate-200 text-slate-600 font-medium rounded-lg text-xs hover:bg-slate-50 transition-all">Cancel</button>
@@ -294,7 +292,7 @@ function openSourcesModal(sources) {
                     <p class="p-4 text-center text-slate-400 text-xs">No custom sources available.</p>
                 ` : sources.map(src => `
                     <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 transition-all text-xs">
-                        <input type="text" value="${src.name}" data-source-id="${src.id}" class="font-medium text-slate-800 bg-transparent border-b border-transparent focus:border-emerald-500 outline-none pb-0.5" />
+                        <input type="text" value="${escapeHTML(src.name)}" data-source-id="${src.id}" class="font-medium text-slate-800 bg-transparent border-b border-transparent focus:border-emerald-500 outline-none pb-0.5" />
                         <div class="flex items-center gap-1.5">
                             <button data-save-source-id="${src.id}" class="text-emerald-600 hover:text-emerald-700 font-semibold text-[11px] h-6 px-1 cursor-pointer hide">Save</button>
                             <button data-del-source-id="${src.id}" class="text-slate-400 hover:text-red-500 p-1 cursor-pointer">

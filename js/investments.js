@@ -1,31 +1,29 @@
 import { supabase } from './supabase.js';
 import { currentUser, reFetchAndRenderCurrentView, showModal, closeModal, showActionSpinner } from './app.js';
-import { formatCurrency, getMonthName } from './utils.js';
+import { formatCurrency, getMonthName, escapeHTML } from './utils.js';
 
 export async function render(container, selectedMonth) {
     if (!currentUser) return;
 
     try {
-        // --- 1. DATA RE-FETCH PHASE ---
-        // A. Fetch Investment Categories
-        const { data: categories, error: cErr } = await supabase
-            .from('investment_categories')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('name', { ascending: true });
-        if (cErr) throw cErr;
-
-        // B. Fetch All Holdings
-        const { data: holdings, error: hErr } = await supabase
-            .from('holdings')
-            .select(`
+        // --- 1. DATA RE-FETCH PHASE — Fetch in parallel ---
+        const [
+            { data: categories, error: cErr },
+            { data: holdings, error: hErr }
+        ] = await Promise.all([
+            // A. Fetch Investment Categories
+            supabase.from('investment_categories').select('*')
+                .eq('user_id', currentUser.id).order('name', { ascending: true }),
+            // B. Fetch All Holdings
+            supabase.from('holdings').select(`
                 *,
                 investment_categories (name, is_recurring),
                 investment_contributions (amount, month, notes),
                 investment_withdrawals (id, amount, date, note)
-            `)
-            .eq('user_id', currentUser.id)
-            .order('name', { ascending: true });
+            `).eq('user_id', currentUser.id).order('name', { ascending: true })
+        ]);
+
+        if (cErr) throw cErr;
         if (hErr) throw hErr;
 
         // --- 2. COMPILE ACTIVE PORTFOLIO STATISTICS (All-time scope) ---
@@ -182,9 +180,7 @@ export async function render(container, selectedMonth) {
                         <div class="border-b border-slate-100 pb-2">
                             <h3 class="font-bold text-slate-900 text-sm">SIP Approvals for ${getMonthName(selectedMonth)}</h3>
                             <p class="text-[10px] text-slate-400">Monthly recurring payments requiring confirmation. Never auto-saved.</p>
-                        </div>
-
-                        <div class="space-y-2.5 max-h-[280px] overflow-y-auto">
+                        </div>                        <div class="space-y-2.5 max-h-[280px] overflow-y-auto">
                             ${pendingSips.length === 0 ? `
                                 <div class="py-10 text-center text-slate-400 text-xs flex flex-col items-center justify-center">
                                     <i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-500 mb-2"></i>
@@ -193,7 +189,7 @@ export async function render(container, selectedMonth) {
                             ` : pendingSips.map(sip => `
                                 <div class="p-3 bg-amber-50/50 border border-amber-250/50 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
                                     <div>
-                                        <div class="font-bold text-slate-800 text-xs">${sip.name}</div>
+                                        <div class="font-bold text-slate-800 text-xs">${escapeHTML(sip.name)}</div>
                                         <div class="text-[10px] font-mono text-amber-700 font-semibold mt-0.5">
                                             Amt: ${formatCurrency(sip.monthly_contribution, sip.currency)}
                                         </div>
@@ -221,7 +217,7 @@ export async function render(container, selectedMonth) {
                                 <div class="bento-card p-5 space-y-3">
                                     <div class="flex justify-between items-center border-b border-slate-50 pb-2 select-none">
                                         <h4 class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                                            <i data-lucide="folder-open" class="w-3.5 h-3.5 text-emerald-600"></i> ${cat.name}
+                                            <i data-lucide="folder-open" class="w-3.5 h-3.5 text-emerald-600"></i> ${escapeHTML(cat.name)}
                                         </h4>
                                         <span class="text-[9px] uppercase tracking-wider font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
                                             ${catHoldings.length} ${catHoldings.length === 1 ? 'holding' : 'holdings'}
@@ -238,7 +234,7 @@ export async function render(container, selectedMonth) {
                                                     <!-- Title & Value summary -->
                                                     <div class="flex justify-between items-start gap-2">
                                                         <div>
-                                                            <div class="font-semibold text-slate-800 text-xs leading-none">${h.name}</div>
+                                                            <div class="font-semibold text-slate-800 text-xs leading-none">${escapeHTML(h.name)}</div>
                                                             ${h.is_recurring ? `
                                                                 <span class="text-[9px] text-indigo-600 font-medium font-sans block mt-1">
                                                                     SIP: ${formatCurrency(h.monthly_contribution, h.currency)} / mo
@@ -265,12 +261,12 @@ export async function render(container, selectedMonth) {
 
                                                     <!-- Notes if available -->
                                                     ${h.notes ? `
-                                                        <p class="text-[10px] text-slate-400 font-medium italic select-none">"${h.notes}"</p>
+                                                        <p class="text-[10px] text-slate-400 font-medium italic select-none">"${escapeHTML(h.notes)}"</p>
                                                     ` : ''}
 
                                                     <!-- Operations Bar -->
                                                     <div class="flex items-center gap-1 justify-end pt-1 bg-white select-none">
-                                                        <button data-update-val-id="${h.id}" class="px-2.5 py-1 text-slate-700 hover:text-emerald-700 bg-slate-50 hover:bg-slate-100 rounded text-[10px] font-bold block transition-all cursor-pointer">
+                                                        <button data-update-val-id="${h.id}" class="px-2.5 py-1 text-slate-705 hover:text-emerald-700 bg-slate-50 hover:bg-slate-100 rounded text-[10px] font-bold block transition-all cursor-pointer">
                                                             Update Value
                                                         </button>
                                                         <button data-withdraw-id="${h.id}" class="px-2.5 py-1 text-slate-705 hover:text-orange-700 bg-slate-50 hover:bg-slate-100 rounded text-[10px] font-bold block transition-all cursor-pointer">
@@ -304,7 +300,7 @@ export async function render(container, selectedMonth) {
                                 return `
                                     <div class="py-3 flex justify-between items-center text-xs">
                                         <div>
-                                            <span class="font-bold text-slate-800">${h.name}</span>
+                                            <span class="font-bold text-slate-800">${escapeHTML(h.name)}</span>
                                             <span class="text-[10px] text-slate-400 block mt-0.5">Closed on ${h.closure_date || ''}</span>
                                         </div>
                                         <div class="text-right font-mono">
@@ -703,7 +699,7 @@ function openSipConfirmForm(holding, selectedMonth) {
             <h3 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 mb-1">
                 <i data-lucide="check-square" class="text-amber-600"></i> Record SIP Payment
             </h3>
-            <p class="text-slate-500 text-xs mb-5">Confirming monthly recurring contribution of <b>${formatCurrency(holding.monthly_contribution, holding.currency)}</b> to holding <b>${holding.name}</b> for ${getMonthName(selectedMonth)}.</p>
+            <p class="text-slate-500 text-xs mb-5">Confirming monthly recurring contribution of <b>${formatCurrency(holding.monthly_contribution, holding.currency)}</b> to holding <b>${escapeHTML(holding.name)}</b> for ${getMonthName(selectedMonth)}.</p>
 
             <form id="sip-confirm-form" class="space-y-4">
                 <div>
@@ -775,7 +771,7 @@ function openUpdateValueForm(holding) {
             <h3 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 mb-1">
                 <i data-lucide="edit-3" class="text-emerald-600"></i> Appraise Valuation
             </h3>
-            <p class="text-slate-500 text-xs mb-5">Update current market value equivalent for <b>${holding.name}</b>.</p>
+            <p class="text-slate-500 text-xs mb-5">Update current market value equivalent for <b>${escapeHTML(holding.name)}</b>.</p>
 
             <form id="evaluation-update-form" class="space-y-4">
                 <div>
@@ -789,7 +785,7 @@ function openUpdateValueForm(holding) {
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
                     <button type="button" id="btn-cancel-eval" class="py-2 border border-slate-200 text-slate-600 font-medium rounded-lg text-xs hover:bg-slate-50 transition-all">Cancel</button>
-                    <button type="submit" class="py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium shadow-lg shadow-emerald-6s0/10 transition-all flex items-center justify-center gap-1">
+                    <button type="submit" class="py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium shadow-lg shadow-emerald-600/10 transition-all flex items-center justify-center gap-1">
                         <i data-lucide="check" class="w-3.5 h-3.5"></i> Update Appraised Value
                     </button>
                 </div>
@@ -832,7 +828,7 @@ function openWithdrawForm(holding) {
             <h3 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 mb-1">
                 <i data-lucide="dollar-sign" class="text-orange-600"></i> Log Withdrawal
             </h3>
-            <p class="text-slate-500 text-xs mb-5">Withdraw active funds from <b>${holding.name}</b>. This proportionally reduces invested principal and appraisal values altogether.</p>
+            <p class="text-slate-500 text-xs mb-5">Withdraw active funds from <b>${escapeHTML(holding.name)}</b>. This proportionally reduces invested principal and appraisal values altogether.</p>
 
             <form id="withdrawer-form" class="space-y-4">
                 <div>
@@ -930,7 +926,7 @@ function openCloseHoldingForm(holding) {
             <h3 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2 mb-1">
                 <i data-lucide="archive" class="text-red-600"></i> Close Holding Account
             </h3>
-            <p class="text-slate-500 text-xs mb-5">Permanently closing <b>${holding.name}</b> moving it to history tracker.</p>
+            <p class="text-slate-500 text-xs mb-5">Permanently closing <b>${escapeHTML(holding.name)}</b> moving it to history tracker.</p>
 
             <form id="closing-acc-form" class="space-y-4">
                 <div>
@@ -1027,7 +1023,7 @@ function openCategoriesModal(categories) {
                 ${categories.map(c => `
                     <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 transition-all text-xs">
                         <div>
-                            <span class="font-bold text-slate-800">${c.name}</span>
+                            <span class="font-bold text-slate-800">${escapeHTML(c.name)}</span>
                             <span class="text-[9px] text-slate-400 block">${c.is_recurring ? 'Recurring SIP schedule' : 'One-time manual purchase'}</span>
                         </div>
                         <button data-del-inv-cat-id="${c.id}" class="text-slate-400 hover:text-red-500 p-1 cursor-pointer">

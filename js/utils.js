@@ -78,3 +78,16 @@ export function validateAmount(amount) {
     const parsed = parseFloat(amount);
     return !isNaN(parsed) && parsed >= 0;
 }
+
+/**
+ * Escapes characters with HTML entities to protect against XSS injections.
+ */
+export function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}

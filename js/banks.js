@@ -1,26 +1,24 @@
 import { supabase } from './supabase.js';
 import { currentUser, reFetchAndRenderCurrentView, showModal, closeModal, showActionSpinner } from './app.js';
-import { formatCurrency, getPrevMonth, getMonthName } from './utils.js';
+import { formatCurrency, getPrevMonth, getMonthName, escapeHTML } from './utils.js';
 
 export async function render(container, selectedMonth) {
     if (!currentUser) return;
 
     try {
         // --- 1. DATA RE-FETCH PHASE ---
-        // A. Fetch All Bank Accounts
-        const { data: accounts, error: aErr } = await supabase
-            .from('bank_accounts')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('bank_name', { ascending: true });
+        const [
+            { data: accounts, error: aErr },
+            { data: monthlyBalances, error: bErr }
+        ] = await Promise.all([
+            // A. Fetch All Bank Accounts
+            supabase.from('bank_accounts').select('*')
+                .eq('user_id', currentUser.id).order('bank_name', { ascending: true }),
+            // B. Fetch Month Balances for selected month
+            supabase.from('bank_balances').select('*')
+                .eq('user_id', currentUser.id).eq('month', selectedMonth)
+        ]);
         if (aErr) throw aErr;
-
-        // B. Fetch Month Balances for selected month
-        const { data: monthlyBalances, error: bErr } = await supabase
-            .from('bank_balances')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .eq('month', selectedMonth);
         if (bErr) throw bErr;
 
         // Compute Total Cash (sum of all closing balances for selected month)
@@ -75,9 +73,9 @@ export async function render(container, selectedMonth) {
                             <div class="bento-card p-5 space-y-4 flex flex-col justify-between hover:shadow-md transition-all">
                                 <div class="flex justify-between items-start">
                                     <div class="space-y-0.5">
-                                        <h3 class="font-bold text-slate-900 text-base leading-none">${acc.bank_name}</h3>
+                                        <h3 class="font-bold text-slate-900 text-base leading-none">${escapeHTML(acc.bank_name)}</h3>
                                         <span class="text-[10px] font-mono text-slate-400 tracking-wider block">
-                                            A/C: ${acc.account_number || 'Not provided'}
+                                            A/C: ${escapeHTML(acc.account_number || 'Not provided')}
                                         </span>
                                     </div>
                                     <div class="p-1 px-2 rounded-full text-[9px] font-bold uppercase tracking-wider font-mono ${hasLogged ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
@@ -100,7 +98,7 @@ export async function render(container, selectedMonth) {
                                     ${hasLogged && balanceRecord.note ? `
                                         <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                                             <span class="text-[8px] uppercase tracking-wider font-bold text-slate-400">Note:</span>
-                                            <p class="text-[10px] text-slate-650 font-medium leading-tight mt-0.5">${balanceRecord.note}</p>
+                                            <p class="text-[10px] text-slate-650 font-medium leading-tight mt-0.5">${escapeHTML(balanceRecord.note)}</p>
                                         </div>
                                     ` : ''}
                                 </div>
@@ -290,8 +288,8 @@ function openAccountsModal(accounts) {
                 ` : accounts.map(acc => `
                     <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 transition-all text-xs">
                         <div>
-                            <input type="text" id="edit-bname-${acc.id}" value="${acc.bank_name}" class="font-bold text-slate-800 bg-transparent border-b border-transparent focus:border-blue-500 outline-none" />
-                            <input type="text" id="edit-bnum-${acc.id}" value="${acc.account_number || ''}" placeholder="No A/C number" class="block text-[10px] text-slate-400 font-mono mt-0.5 bg-transparent border-b border-transparent focus:border-blue-500 outline-none" />
+                            <input type="text" id="edit-bname-${acc.id}" value="${escapeHTML(acc.bank_name)}" class="font-bold text-slate-800 bg-transparent border-b border-transparent focus:border-blue-500 outline-none" />
+                            <input type="text" id="edit-bnum-${acc.id}" value="${escapeHTML(acc.account_number || '')}" placeholder="No A/C number" class="block text-[10px] text-slate-400 font-mono mt-0.5 bg-transparent border-b border-transparent focus:border-blue-500 outline-none" />
                         </div>
                         <div class="flex items-center gap-1.5">
                             <button data-save-bank-id="${acc.id}" class="text-blue-600 hover:text-blue-700 font-semibold text-[11px] px-1 cursor-pointer">Save</button>

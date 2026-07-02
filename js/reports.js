@@ -1,123 +1,74 @@
 import { supabase } from './supabase.js';
 import { currentUser } from './app.js';
-import { formatCurrency, getPrevMonth, getMonthName } from './utils.js';
+import { formatCurrency, getPrevMonth, getMonthName, escapeHTML } from './utils.js';
 
 export async function render(container, selectedMonth) {
     if (!currentUser) return;
 
     try {
-        // --- 1. DATA RE-FETCH PHASE ---
-        // A. Income entries for selected month
-        const { data: incomes, error: incErr } = await supabase
-            .from('income_entries')
-            .select(`
-                amount,
-                date_credited,
-                note,
-                income_sources (name)
-            `)
-            .eq('user_id', currentUser.id)
-            .eq('month', selectedMonth);
+        // --- 1. DATA RE-FETCH PHASE — Fetch all 8 queries in parallel via Promise.all ---
+        const prevMonth = getPrevMonth(selectedMonth);
+
+        const [
+            { data: incomes, error: incErr },
+            { data: expenses, error: expErr },
+            { data: contributions, error: contrErr },
+            { data: bankLedgers, error: bankErr },
+            { data: activeHoldings, error: holdErr },
+            { data: prevIncomes },
+            { data: prevExpenses },
+            { data: prevContrs }
+        ] = await Promise.all([
+            // A. Income entries for selected month
+            supabase.from('income_entries').select('amount, date_credited, note, income_sources (name)')
+                .eq('user_id', currentUser.id).eq('month', selectedMonth),
+            // B. Expense entries for selected month
+            supabase.from('expense_entries').select('amount, category_id, date, note, expense_categories (name)')
+                .eq('user_id', currentUser.id).eq('month', selectedMonth),
+            // C. Investment Contributions (SIPs Confirmed) for selected month
+            supabase.from('investment_contributions').select('amount, holding_id, holdings (name, is_recurring)')
+                .eq('user_id', currentUser.id).eq('month', selectedMonth),
+            // D. Bank Balances (Opening, Closing, Net changes) for selected month
+            supabase.from('bank_balances').select('opening_balance, closing_balance, note, bank_accounts (bank_name, account_number)')
+                .eq('user_id', currentUser.id).eq('month', selectedMonth),
+            // E. Holdings totals for investment snapshot
+            supabase.from('holdings').select('id, invested_amount, current_value, is_recurring, investment_contributions (amount), investment_withdrawals (amount)')
+                .eq('user_id', currentUser.id).eq('is_closed', false),
+            // F. Prev month income (for MoM comparison)
+            supabase.from('income_entries').select('amount')
+                .eq('user_id', currentUser.id).eq('month', prevMonth),
+            // G. Prev month expenses (for MoM comparison)
+            supabase.from('expense_entries').select('amount')
+                .eq('user_id', currentUser.id).eq('month', prevMonth),
+            // H. Prev month investment contributions
+            supabase.from('investment_contributions').select('amount')
+                .eq('user_id', currentUser.id).eq('month', prevMonth)
+        ]);
+
         if (incErr) throw incErr;
+        if (expErr) throw expErr;
+        if (contrErr) throw contrErr;
+        if (bankErr) throw bankErr;
+        if (holdErr) throw holdErr;
 
         const totalIncome = incomes.reduce((sum, item) => sum + parseFloat(item.amount), 0);
-
-        // B. Expense entries for selected month
-        const { data: expenses, error: expErr } = await supabase
-            .from('expense_entries')
-            .select(`
-                amount,
-                category_id,
-                date,
-                note,
-                expense_categories (name)
-            `)
-            .eq('user_id', currentUser.id)
-            .eq('month', selectedMonth);
-        if (expErr) throw expErr;
-
         const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.amount), 0);
-
-        // C. Investment Contributions (SIPs Confirmed) for selected month
-        const { data: contributions, error: contrErr } = await supabase
-            .from('investment_contributions')
-            .select(`
-                amount,
-                holding_id,
-                holdings (name, is_recurring)
-            `)
-            .eq('user_id', currentUser.id)
-            .eq('month', selectedMonth);
-        if (contrErr) throw contrErr;
-
         const totalContributions = contributions.reduce((sum, item) => sum + parseFloat(item.amount), 0);
-
-        // D. Bank Balances (Opening, Closing, Net changes) for selected month
-        const { data: bankLedgers, error: bankErr } = await supabase
-            .from('bank_balances')
-            .select(`
-                opening_balance,
-                closing_balance,
-                note,
-                bank_accounts (bank_name, account_number)
-            `)
-            .eq('user_id', currentUser.id)
-            .eq('month', selectedMonth);
-        if (bankErr) throw bankErr;
-
-        // E. Holdings totals for investment snapshot
-        const { data: activeHoldings, error: holdErr } = await supabase
-            .from('holdings')
-            .select(`
-                id, 
-                invested_amount,
-                current_value,
-                is_recurring,
-                investment_contributions (amount),
-                investment_withdrawals (amount)
-            `)
-            .eq('user_id', currentUser.id)
-            .eq('is_closed', false);
-        if (holdErr) throw holdErr;
 
         let totalInvestedActive = 0;
         let totalCurrentValueActive = 0;
-
         activeHoldings.forEach(holding => {
-            let invested = 0;
-            if (holding.is_recurring) {
-                invested = (holding.investment_contributions || []).reduce((sum, c) => sum + parseFloat(c.amount), 0);
-            } else {
-                invested = parseFloat(holding.invested_amount || 0);
-            }
+            let invested = holding.is_recurring
+                ? (holding.investment_contributions || []).reduce((sum, c) => sum + parseFloat(c.amount), 0)
+                : parseFloat(holding.invested_amount || 0);
             const withdrawalsSum = (holding.investment_withdrawals || []).reduce((sum, w) => sum + parseFloat(w.amount), 0);
             invested = Math.max(0, invested - withdrawalsSum);
-
             totalInvestedActive += invested;
             totalCurrentValueActive += parseFloat(holding.current_value || 0);
         });
 
-        // F. PREV_MONTH COMPARE VALUES
-        const prevMonth = getPrevMonth(selectedMonth);
-        const { data: prevIncomes } = await supabase
-            .from('income_entries')
-            .select('amount')
-            .eq('user_id', currentUser.id)
-            .eq('month', prevMonth);
         const prevTotalIncome = (prevIncomes || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
-
-        const { data: prevExpenses } = await supabase
-            .from('expense_entries')
-            .select('amount')
-            .eq('user_id', currentUser.id)
-            .eq('month', prevMonth);
         const prevTotalExpenses = (prevExpenses || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
-
-        const { data: prevContrs } = await supabase
-            .from('investment_contributions')
-            .select('amount')
-            .eq('user_id', currentUser.id)
-            .eq('month', prevMonth);
         const prevTotalContributions = (prevContrs || []).reduce((sum, item) => sum + parseFloat(item.amount), 0);
 
         // --- 2. REPORTS CALCULATIONS ---
@@ -177,7 +128,7 @@ export async function render(container, selectedMonth) {
         if (topCatAmt > 0) {
             insights.push({
                 type: 'neutral',
-                text: `Highest expense category: <b>${topCatName}</b> with a total spend of <b>${formatCurrency(topCatAmt)}</b>.`,
+                text: `Highest expense category: <b>${escapeHTML(topCatName)}</b> with a total spend of <b>${formatCurrency(topCatAmt)}</b>.`,
                 icon: 'arrow-right-circle'
             });
         }
@@ -276,7 +227,7 @@ export async function render(container, selectedMonth) {
                                     </tr>
                                 ` : incomes.map(item => `
                                     <tr class="hover:bg-slate-50/30 transition-all">
-                                        <td class="p-3 font-semibold text-slate-800">${item.income_sources?.name || 'Unassigned'}</td>
+                                        <td class="p-3 font-semibold text-slate-800">${escapeHTML(item.income_sources?.name || 'Unassigned')}</td>
                                         <td class="p-3 font-mono text-slate-450">${item.date_credited}</td>
                                         <td class="p-3 font-mono text-right font-bold text-emerald-600">${formatCurrency(item.amount)}</td>
                                     </tr>
@@ -307,7 +258,7 @@ export async function render(container, selectedMonth) {
                                     const percentageVal = totalExpenses > 0 ? (sum / totalExpenses) * 100 : 0;
                                     return `
                                         <tr class="hover:bg-slate-50/30 transition-all font-mono">
-                                            <td class="p-3 font-sans font-semibold text-slate-800">${name}</td>
+                                            <td class="p-3 font-sans font-semibold text-slate-800">${escapeHTML(name)}</td>
                                             <td class="p-3 text-slate-500 font-bold">${percentageVal.toFixed(0)}%</td>
                                             <td class="p-3 text-right font-bold text-rose-500">${formatCurrency(sum)}</td>
                                         </tr>
@@ -347,8 +298,8 @@ export async function render(container, selectedMonth) {
                                     return `
                                         <tr class="hover:bg-slate-50/30 transition-all">
                                             <td class="p-3 font-sans font-semibold text-slate-800">
-                                                ${item.bank_accounts?.bank_name || 'Unlinked Bank'}
-                                                <span class="block font-mono text-[9px] text-slate-400 font-normal mt-0.5">No: ${item.bank_accounts?.account_number || '—'}</span>
+                                                ${escapeHTML(item.bank_accounts?.bank_name || 'Unlinked Bank')}
+                                                <span class="block font-mono text-[9px] text-slate-400 font-normal mt-0.5">No: ${escapeHTML(item.bank_accounts?.account_number || '—')}</span>
                                             </td>
                                             <td class="p-3 text-slate-650">${formatCurrency(item.opening_balance)}</td>
                                             <td class="p-3 font-bold text-slate-900">${formatCurrency(item.closing_balance)}</td>
