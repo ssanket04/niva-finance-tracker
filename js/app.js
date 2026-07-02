@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured, saveSupabaseConfig, isConfiguredViaEnv, getGeminiApiKey } from './supabase.js';
+import { supabase, isSupabaseConfigured, saveSupabaseConfig, isConfiguredViaEnv } from './supabase.js';
 import { getMonthName, getPrevMonth, getNextMonth, escapeHTML } from './utils.js';
 
 // App state
@@ -49,7 +49,6 @@ async function handleAuthChange(user) {
         showSetupOverlay(false);
         document.getElementById('month-navigation-ribbon').classList.remove('hidden');
         document.getElementById('btn-logout').classList.remove('hidden');
-        document.getElementById('btn-voice-quick-add').classList.remove('hidden');
         
         const userEmailSpan = document.getElementById('user-display-email');
         if (userEmailSpan) {
@@ -70,7 +69,6 @@ async function handleAuthChange(user) {
     } else {
         document.getElementById('month-navigation-ribbon').classList.add('hidden');
         document.getElementById('btn-logout').classList.add('hidden');
-        document.getElementById('btn-voice-quick-add').classList.add('hidden');
         
         const userEmailSpan = document.getElementById('user-display-email');
         if (userEmailSpan) {
@@ -319,135 +317,6 @@ function setupUIControls() {
             if (target) navigateTo(target);
         });
     });
-
-    // Global Voice Quick Add (Mic button in header)
-    const voiceQuickBtn = document.getElementById('btn-voice-quick-add');
-    if (voiceQuickBtn) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            voiceQuickBtn.addEventListener('click', () => {
-                const geminiKey = getGeminiApiKey();
-                if (!geminiKey) {
-                    alert("Please click the database icon in the header and configure your Gemini API Key first to enable Voice Quick Add.");
-                    showSetupOverlay(true);
-                    return;
-                }
-
-                const recognition = new SpeechRecognition();
-                recognition.lang = 'en-IN'; // Indian accents / Hinglish
-                recognition.continuous = false;
-                recognition.interimResults = false;
-
-                // Create a floating overlay panel for voice status
-                const overlay = document.createElement('div');
-                overlay.className = "fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4";
-                overlay.innerHTML = `
-                    <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl p-6 text-center border border-slate-100 flex flex-col items-center space-y-4">
-                        <div class="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 animate-pulse" id="voice-overlay-icon">
-                            <i data-lucide="mic" class="w-8 h-8"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900" id="voice-overlay-status">Listening for transaction...</h3>
-                            <p class="text-slate-400 text-[10px] mt-1.5 leading-normal">Speak naturally. E.g.:<br/>"Spent 500 on pizza yesterday"<br/>"Salary of 65000 credited today"</p>
-                        </div>
-                        <button type="button" id="btn-cancel-voice-overlay" class="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs cursor-pointer">Cancel</button>
-                    </div>
-                `;
-                document.body.appendChild(overlay);
-                if (window.lucide) window.lucide.createIcons();
-
-                document.getElementById('btn-cancel-voice-overlay').addEventListener('click', () => {
-                    recognition.abort();
-                    overlay.remove();
-                });
-
-                recognition.onstart = () => {
-                    console.log("Voice quick add recognition started");
-                };
-
-                recognition.onerror = (err) => {
-                    console.error("Speech Recognition error:", err);
-                    document.getElementById('voice-overlay-status').textContent = "Speech recognition failed.";
-                    setTimeout(() => overlay.remove(), 1500);
-                };
-
-                recognition.onend = () => {
-                    // Handled inside result or error
-                };
-
-                recognition.onresult = async (event) => {
-                    const transcript = event.results[0][0].transcript;
-                    document.getElementById('voice-overlay-status').textContent = "Processing speech...";
-                    document.getElementById('voice-overlay-icon').className = "w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-500";
-                    document.getElementById('voice-overlay-icon').innerHTML = `<div class="w-6 h-6 border-2 border-blue-500/25 border-t-blue-500 rounded-full animate-spin"></div>`;
-
-                    try {
-                        const parsedData = await parseTransactionWithGemini(transcript, geminiKey);
-                        overlay.remove();
-                        if (parsedData) {
-                            openPrefilledModal(parsedData);
-                        }
-                    } catch (e) {
-                        console.error("Gemini Parse failed:", e);
-                        document.getElementById('voice-overlay-status').textContent = "Error parsing transaction: " + e.message;
-                        setTimeout(() => overlay.remove(), 2500);
-                    }
-                };
-
-                recognition.start();
-            });
-        } else {
-            // Hide if SpeechRecognition is not supported on this browser (Firefox desktop)
-            voiceQuickBtn.style.display = 'none';
-        }
-    }
-}
-
-async function parseTransactionWithGemini(sentence, apiKey) {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const prompt = `You are a conversational financial transaction parser. Parse the following sentence: "${sentence}".
-System context: Today is ${todayStr}.
-Analyze the category and match it to one of these standard category names: [Travel, Food, Shopping, Bills, Salary, Investment, Miscellaneous].
-Return ONLY a valid raw JSON object. Do not include markdown codeblocks or other text.
-JSON Structure:
-{
-  "type": "income" or "expense",
-  "amount": number,
-  "note": "string (cleaned merchant or note)",
-  "category_name": "string (matching category options)",
-  "date": "YYYY-MM-DD"
-}`;
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' }
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
-    }
-
-    const resJson = await response.json();
-    const parsedText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!parsedText) {
-        throw new Error("Empty response from AI engine.");
-    }
-
-    return JSON.parse(parsedText);
-}
-
-function openPrefilledModal(parsedData) {
-    window.prefilledVoiceTransaction = parsedData;
-    if (parsedData.type === 'income') {
-        navigateTo('income');
-    } else {
-        navigateTo('expenses');
-    }
 }
 
 /**

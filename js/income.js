@@ -222,15 +222,10 @@ function openEntryModal(entry, sources, selectedMonth) {
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Note (Optional)</label>
-                    <div class="relative flex items-center">
-                        <input type="text" id="entry-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Client payout, side job salary" class="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
-                        <button type="button" id="btn-voice-dictate" class="absolute right-1.5 p-1 text-slate-400 hover:text-emerald-600 transition-all rounded cursor-pointer" title="Voice Dictate">
-                            <i data-lucide="mic" class="w-4 h-4"></i>
-                        </button>
-                    </div>
+                    <input type="text" id="entry-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Client payout, side job salary" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
                 </div>
                 <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button type="button" id="btn-cancel-modal" class="py-2 border border-slate-200 text-slate-600 font-medium rounded-lg text-xs hover:bg-slate-50 transition-all">Cancel</button>
+                    <button type="button" id="btn-cancel-modal" class="py-2 border border-slate-200 text-slate-605 font-medium rounded-lg text-xs hover:bg-slate-50 transition-all">Cancel</button>
                     <button type="submit" class="py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium shadow-lg shadow-emerald-500/10 transition-all flex items-center justify-center gap-1">
                         <i data-lucide="check" class="w-3.5 h-3.5"></i> Save Document
                     </button>
@@ -297,45 +292,6 @@ function openEntryModal(entry, sources, selectedMonth) {
                 showActionSpinner(false);
             }
         });
-
-        // Speech recognition setup
-        const entryNoteInput = document.getElementById('entry-note');
-        const voiceBtn = document.getElementById('btn-voice-dictate');
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'en-IN'; // Indian accent
-            recognition.continuous = false;
-            recognition.interimResults = false;
-
-            recognition.onstart = () => {
-                voiceBtn.classList.add('text-rose-500', 'animate-pulse');
-                entryNoteInput.placeholder = "Listening...";
-            };
-
-            recognition.onerror = (err) => {
-                console.error("Speech Recognition error:", err);
-                voiceBtn.classList.remove('text-rose-500', 'animate-pulse');
-                entryNoteInput.placeholder = "E.g., Client payout, side job salary";
-            };
-
-            recognition.onend = () => {
-                voiceBtn.classList.remove('text-rose-500', 'animate-pulse');
-                entryNoteInput.placeholder = "E.g., Client payout, side job salary";
-            };
-
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                entryNoteInput.value = transcript;
-            };
-
-            voiceBtn.addEventListener('click', () => {
-                recognition.start();
-            });
-        } else {
-            voiceBtn.style.display = 'none';
-        }
 
         if (window.lucide) window.lucide.createIcons();
     });

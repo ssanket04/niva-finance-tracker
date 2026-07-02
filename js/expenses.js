@@ -357,12 +357,7 @@ function openExpenseModal(entry, categories, selectedMonth, classifier, training
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Observation Memo / Note</label>
-                    <div class="relative flex items-center">
-                        <input type="text" id="exp-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Groceries purchases, uber ride to station" class="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
-                        <button type="button" id="btn-voice-dictate" class="absolute right-1.5 p-1 text-slate-400 hover:text-rose-500 transition-all rounded cursor-pointer" title="Voice Dictate">
-                            <i data-lucide="mic" class="w-4 h-4"></i>
-                        </button>
-                    </div>
+                    <input type="text" id="exp-note" value="${isEdit ? escapeHTML(entry.note || '') : ''}" placeholder="E.g., Groceries purchases, uber ride to station" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-lg focus:border-emerald-500 text-xs" />
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
@@ -461,45 +456,6 @@ function openExpenseModal(entry, categories, selectedMonth, classifier, training
                     expCatSelect.value = predictedCat;
                 }
             });
-        }
-
-        // Voice dictation setup
-        const voiceBtn = document.getElementById('btn-voice-dictate');
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'en-IN'; // Hinglish / English accent
-            recognition.continuous = false;
-            recognition.interimResults = false;
-
-            recognition.onstart = () => {
-                voiceBtn.classList.add('text-rose-500', 'animate-pulse');
-                expNoteInput.placeholder = "Listening...";
-            };
-
-            recognition.onerror = (err) => {
-                console.error("Speech Recognition error:", err);
-                voiceBtn.classList.remove('text-rose-500', 'animate-pulse');
-                expNoteInput.placeholder = "E.g., Groceries purchases, uber ride to station";
-            };
-
-            recognition.onend = () => {
-                voiceBtn.classList.remove('text-rose-500', 'animate-pulse');
-                expNoteInput.placeholder = "E.g., Groceries purchases, uber ride to station";
-            };
-
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                expNoteInput.value = transcript;
-                expNoteInput.dispatchEvent(new Event('input')); // trigger predictor
-            };
-
-            voiceBtn.addEventListener('click', () => {
-                recognition.start();
-            });
-        } else {
-            voiceBtn.style.display = 'none';
         }
         
         // Refresh icons inside modal
