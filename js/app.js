@@ -260,9 +260,8 @@ function setupCredentialsOverlay() {
         e.preventDefault();
         const url = document.getElementById('setup-url').value;
         const key = document.getElementById('setup-key').value;
-        const geminiKey = document.getElementById('setup-gemini-key').value;
         
-        if (saveSupabaseConfig(url, key, geminiKey)) {
+        if (saveSupabaseConfig(url, key)) {
             window.location.reload();
         }
     });
@@ -272,7 +271,6 @@ function setupCredentialsOverlay() {
         // Pre-fill from sessionStorage
         document.getElementById('setup-url').value = sessionStorage.getItem('FIN_SUPABASE_URL') || '';
         document.getElementById('setup-key').value = sessionStorage.getItem('FIN_SUPABASE_ANON_KEY') || '';
-        document.getElementById('setup-gemini-key').value = sessionStorage.getItem('FIN_GEMINI_API_KEY') || '';
     });
 }
 

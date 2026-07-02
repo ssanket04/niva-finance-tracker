@@ -21,14 +21,9 @@ if (isSupabaseConfigured()) {
     }
 }
 
-export function saveSupabaseConfig(url, anonKey, geminiKey) {
+export function saveSupabaseConfig(url, anonKey) {
     sessionStorage.setItem('FIN_SUPABASE_URL', url.trim());
     sessionStorage.setItem('FIN_SUPABASE_ANON_KEY', anonKey.trim());
-    if (geminiKey) {
-        sessionStorage.setItem('FIN_GEMINI_API_KEY', geminiKey.trim());
-    } else {
-        sessionStorage.removeItem('FIN_GEMINI_API_KEY');
-    }
     supabaseUrl = url.trim();
     supabaseAnonKey = anonKey.trim();
     supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -38,12 +33,7 @@ export function saveSupabaseConfig(url, anonKey, geminiKey) {
 export function clearSupabaseConfig() {
     sessionStorage.removeItem('FIN_SUPABASE_URL');
     sessionStorage.removeItem('FIN_SUPABASE_ANON_KEY');
-    sessionStorage.removeItem('FIN_GEMINI_API_KEY');
     supabaseUrl = '';
     supabaseAnonKey = '';
     supabase = null;
-}
-
-export function getGeminiApiKey() {
-    return import.meta.env.VITE_GEMINI_API_KEY || sessionStorage.getItem('FIN_GEMINI_API_KEY') || '';
 }
