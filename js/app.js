@@ -173,10 +173,33 @@ export async function navigateTo(viewName) {
 
     // Dynamic import to cache modular renders
     try {
-        if (!views[viewName]) {
-            const module = await import(`./${viewName}.js`);
+            let module;
+            switch (viewName) {
+                case 'dashboard':
+                    module = await import('./dashboard.js');
+                    break;
+                case 'income':
+                    module = await import('./income.js');
+                    break;
+                case 'banks':
+                    module = await import('./banks.js');
+                    break;
+                case 'investments':
+                    module = await import('./investments.js');
+                    break;
+                case 'expenses':
+                    module = await import('./expenses.js');
+                    break;
+                case 'reports':
+                    module = await import('./reports.js');
+                    break;
+                case 'future-wealth':
+                    module = await import('./future-wealth.js');
+                    break;
+                default:
+                    throw new Error(`Unknown view: ${viewName}`);
+            }
             views[viewName] = module;
-        }
         
         await views[viewName].render(appContent, selectedMonth);
         
