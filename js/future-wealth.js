@@ -170,6 +170,37 @@ export function render(container, selectedMonth) {
                     </div>
                 </div>
 
+                <!-- 6. Stocks CAGR Calculator -->
+                <div class="bento-card p-5 space-y-4 hover:border-emerald-600 transition-all select-none">
+                    <div class="flex items-center gap-2 border-b border-slate-50 pb-2.5">
+                        <div class="bg-emerald-50 p-1.5 rounded-lg text-emerald-600">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        </div>
+                        <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Stocks CAGR compounding</h4>
+                    </div>
+                    <div class="space-y-3.5 text-xs text-slate-600">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-450 uppercase mb-1">Lump Sum Invested (₹)</label>
+                            <input type="number" id="stock-principal" value="50000" min="500" step="500" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-slate-800" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-450 uppercase mb-1">Expected CAGR (%)</label>
+                                <input type="number" id="stock-rate" value="15" min="1" max="50" step="0.5" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-slate-800" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-450 uppercase mb-1">Tenure (Years)</label>
+                                <input type="number" id="stock-years" value="5" min="1" max="30" step="1" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-slate-800" />
+                            </div>
+                        </div>
+                        
+                        <div class="bg-emerald-500/[0.03] border border-emerald-500/10 rounded-xl p-3.5 text-center mt-2.5">
+                            <span class="text-[9px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">Projected Portfolio Value</span>
+                            <span class="text-base font-mono font-bold text-emerald-650" id="stock-result-fv">₹0</span>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     `;
@@ -258,6 +289,20 @@ function connectCalculatorTriggers() {
         document.getElementById('liq-result-fv').textContent = formatCurrency(fv, 'INR');
     };
 
+    // 6. Stocks CAGR compounding growth
+    // Compound principal: A = P * (1 + r/100)^t
+    const doStockCalc = () => {
+        const p = parseFloat(document.getElementById('stock-principal').value || 0);
+        const r = parseFloat(document.getElementById('stock-rate').value || 0);
+        const y = parseFloat(document.getElementById('stock-years').value || 0);
+
+        let fv = 0;
+        if (p > 0 && r > 0 && y > 0) {
+            fv = p * Math.pow(1 + r/100, y);
+        }
+        document.getElementById('stock-result-fv').textContent = formatCurrency(fv, 'INR');
+    };
+
     // Listen to changes reactive format
     ['sip-monthly', 'sip-rate', 'sip-years'].forEach(id => {
         document.getElementById(id).addEventListener('input', doSipCalc);
@@ -279,10 +324,15 @@ function connectCalculatorTriggers() {
         document.getElementById(id).addEventListener('input', doLiqCalc);
     });
 
+    ['stock-principal', 'stock-rate', 'stock-years'].forEach(id => {
+        document.getElementById(id).addEventListener('input', doStockCalc);
+    });
+
     // Fire initial runs so they render with values loaded
     doSipCalc();
     doFdCalc();
     doUsCalc();
     doGoldCalc();
     doLiqCalc();
+    doStockCalc();
 }
