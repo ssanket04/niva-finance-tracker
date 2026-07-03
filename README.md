@@ -13,26 +13,35 @@ Niva is a production-grade, privacy-centric vanilla JavaScript web application b
      $$\text{Savings Rate} = \frac{\text{Total Income} - \text{Total Expenses}}{\text{Total Income}} \times 100$$
    * Highlights interactive empty-state checklists for new profiles to guide initial setup.
 
-2. **Local AI Category Autocomplete**:
+2. **Username-Based Authentication**:
+   * Registration accepts a unique custom username (3–25 characters, lowercase, alphanumeric characters, underscores, and periods).
+   * Login allows authentication with **either** the User's Email or their registered Username + Password.
+   * Disables raw emails as primary user identities, automatically displaying the profile username in header panels.
+
+3. **Mobile-First Responsive Layouts**:
+   * Stacks wide tables, cards, forms, and charts dynamically on screens down to 320px width (e.g. iPhone SE/14, Android, and tablets).
+   * Responsive bottom navigation bar scales down to icons-only on small mobile screens to prevent overlaps, restoring textual labels on wider displays.
+
+4. **Local AI Category Autocomplete**:
    * Includes a custom, client-side **Naive Bayes Text Classifier** that learns from your transaction history.
    * As you type note descriptions inside the Add Expense log (e.g. `"Zomato lunch"`), it automatically pre-selects the appropriate category (e.g. `"Food"`) on-the-fly.
    * **100% private and runs locally on your CPU**—no external API dependencies, credits, or keys needed.
 
-3. **Typo & Anomaly Detector**:
+5. **Typo & Anomaly Detector**:
    * Evaluates standard deviations of category entries locally.
    * Automatically triggers a warning confirmation modal if you enter an amount that deviates by $>2.5\times$ standard deviations from the category mean (e.g. accidental extra zeros).
 
-4. **Smart Context-Aware Portfolio Builder**:
+6. **Smart Context-Aware Portfolio Builder**:
    * Adapts dynamically to asset classes:
      * **Fixed Deposits**: Bank name, Principal, interest rates, start/maturity dates, and quarterly compounding projection logs.
      * **Stocks**: Stock identifier symbol, Qty, and Avg Buy Price (auto-calculates total invested vs. current valuation).
      * **Gold (SGB)**: Series name, Principal, issue/maturity dates, and $2.5\%$ simple annual coupon calculations.
      * **Mutual Funds / US Portfolios**: Mutual fund name, monthly SIP contribution, and current appraisal.
 
-5. **Dynamic Banking Ledger**:
+7. **Dynamic Banking Ledger**:
    * Configures bank opening/closing balances, reconciliation sheets, and records monthly cash reserves.
 
-6. **Simulators & Future Wealth Projection**:
+8. **Simulators & Future Wealth Projection**:
    * Evaluates CAGR growth models for SIPs, quarterly compounding formulas for Fixed Deposits, and SGB simple interest logic.
 
 ---

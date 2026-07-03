@@ -187,14 +187,14 @@ export async function render(container, selectedMonth) {
                                     All recurring investments and SIP contributions logged for this month!
                                 </div>
                             ` : pendingSips.map(sip => `
-                                <div class="p-3 bg-amber-50/50 border border-amber-250/50 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
+                                <div class="p-3 bg-amber-50/50 border border-amber-250/50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-fade-in">
                                     <div>
                                         <div class="font-bold text-slate-800 text-xs">${escapeHTML(sip.name)}</div>
                                         <div class="text-[10px] font-mono text-amber-700 font-semibold mt-0.5">
                                             Amt: ${formatCurrency(sip.monthly_contribution, sip.currency)}
                                         </div>
                                     </div>
-                                    <button data-confirm-sip-id="${sip.id}" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold tracking-tight transition-all shadow-md shadow-amber-600/10 cursor-pointer">
+                                    <button data-confirm-sip-id="${sip.id}" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold tracking-tight transition-all shadow-md shadow-amber-600/10 cursor-pointer w-full sm:w-auto text-center">
                                         Confirm
                                     </button>
                                 </div>

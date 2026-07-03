@@ -41,7 +41,7 @@ export async function render(container, selectedMonth) {
                 </div>
 
                 <!-- Total Cash Aggregator (Sum of all closing balances for selected month) -->
-                <div class="bento-card p-5 bg-gradient-to-r from-blue-50/50 to-white flex items-center justify-between border-l-4 border-l-blue-600 select-none">
+                <div class="bento-card p-5 bg-gradient-to-r from-blue-50/50 to-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-l-4 border-l-blue-600 select-none">
                     <div class="flex items-center gap-3">
                         <div class="bg-blue-100 p-2.5 rounded-xl text-blue-600">
                             <i data-lucide="coins" class="w-5 h-5"></i>
@@ -51,7 +51,7 @@ export async function render(container, selectedMonth) {
                             <div class="text-xs text-slate-650">Sum of bank closing balances in ${getMonthName(selectedMonth)}</div>
                         </div>
                     </div>
-                    <div class="text-right">
+                    <div class="text-left sm:text-right">
                         <span class="text-[10px] text-slate-405 font-medium leading-none block">Aggregate Balance</span>
                         <span class="text-xl font-mono font-bold text-slate-950">${formatCurrency(totalCash)}</span>
                     </div>

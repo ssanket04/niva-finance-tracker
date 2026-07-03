@@ -76,7 +76,7 @@ export async function render(container, selectedMonth) {
                 </div>
 
                 <!-- Monthly Total banner -->
-                <div class="bento-card p-5 bg-gradient-to-r from-emerald-50 to-white flex items-center justify-between border-l-4 border-l-emerald-500 select-none">
+                <div class="bento-card p-5 bg-gradient-to-r from-emerald-50 to-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-l-4 border-l-emerald-500 select-none">
                     <div class="flex items-center gap-3">
                         <div class="bg-emerald-100/80 p-2.5 rounded-xl text-emerald-600">
                             <i data-lucide="arrow-down-left" class="w-5 h-5"></i>
@@ -86,7 +86,7 @@ export async function render(container, selectedMonth) {
                             <div class="text-xs text-slate-650">Sum of cash outflows in selected month</div>
                         </div>
                     </div>
-                    <div class="text-right">
+                    <div class="text-left sm:text-right">
                         <span class="text-[10px] text-slate-405 font-medium leading-none block">Aggregate Expenses</span>
                         <span class="text-xl font-mono font-bold text-slate-950">${formatCurrency(totalExpenses)}</span>
                     </div>

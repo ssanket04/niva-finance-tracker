@@ -52,8 +52,22 @@ async function handleAuthChange(user) {
         
         const userEmailSpan = document.getElementById('user-display-email');
         if (userEmailSpan) {
-            userEmailSpan.textContent = user.email;
+            // Instant fallback placeholder
+            let displayName = user.user_metadata?.username || user.email.split('@')[0];
+            userEmailSpan.textContent = displayName;
             userEmailSpan.classList.remove('hidden');
+
+            // Asynchronously resolve true DB username
+            supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', user.id)
+                .maybeSingle()
+                .then(({ data }) => {
+                    if (data && data.username) {
+                        userEmailSpan.textContent = data.username;
+                    }
+                });
         }
 
         document.getElementById('bottom-navigation-bar').classList.remove('hidden');
@@ -497,9 +511,13 @@ function renderAuthScreen(customErrorMsg = "") {
             ` : ''}
 
             <form id="auth-main-form" class="space-y-4">
+                <div id="username-field-container" class="hidden">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Username</label>
+                    <input type="text" id="auth-username" placeholder="Choose a username" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 outline-none rounded-xl focus:border-blue-500 focus:bg-white text-xs font-medium transition-all" />
+                </div>
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Email address</label>
-                    <input type="email" id="auth-email" required placeholder="name@example.com" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 outline-none rounded-xl focus:border-blue-500 focus:bg-white text-xs font-medium transition-all" />
+                    <label id="auth-identity-label" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Email address or Username</label>
+                    <input type="text" id="auth-email" required placeholder="Username or email" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 outline-none rounded-xl focus:border-blue-500 focus:bg-white text-xs font-medium transition-all" />
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Password</label>
@@ -527,6 +545,10 @@ function renderAuthScreen(customErrorMsg = "") {
     const form = document.getElementById('auth-main-form');
     const authToggle = document.getElementById('btn-auth-toggle');
     const btnSubmit = document.getElementById('btn-auth-submit');
+    const usernameContainer = document.getElementById('username-field-container');
+    const authUsernameInput = document.getElementById('auth-username');
+    const identityLabel = document.getElementById('auth-identity-label');
+    const identityInput = document.getElementById('auth-email');
 
     authToggle.addEventListener('click', () => {
         if (mode === 'signin') {
@@ -534,30 +556,95 @@ function renderAuthScreen(customErrorMsg = "") {
             btnSubmit.innerHTML = `<i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Register Account`;
             authToggle.textContent = 'Sign In';
             form.closest('div').querySelector('p').firstChild.textContent = 'Already have an account? ';
+            
+            usernameContainer.classList.remove('hidden');
+            authUsernameInput.required = true;
+            identityLabel.textContent = "Email address";
+            identityInput.type = "email";
+            identityInput.placeholder = "name@example.com";
         } else {
             mode = 'signin';
             btnSubmit.innerHTML = `<i data-lucide="log-in" class="w-3.5 h-3.5"></i> Sign In to Account`;
             authToggle.textContent = 'Create Account';
             form.closest('div').querySelector('p').firstChild.textContent = `Don't have an enterprise account? `;
+            
+            usernameContainer.classList.add('hidden');
+            authUsernameInput.required = false;
+            authUsernameInput.value = "";
+            identityLabel.textContent = "Email address or Username";
+            identityInput.type = "text";
+            identityInput.placeholder = "Username or email";
         }
         if (window.lucide) window.lucide.createIcons();
     });
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = document.getElementById('auth-email').value;
+        const identity = identityInput.value.trim();
         const password = document.getElementById('auth-password').value;
 
         showActionSpinner(true);
         try {
             if (mode === 'signin') {
-                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                let targetEmail = identity;
+                
+                // If it doesn't contain '@', treat it as username lookup
+                if (!identity.includes('@')) {
+                    const { data: profile, error: profileErr } = await supabase
+                        .from('profiles')
+                        .select('email')
+                        .eq('username', identity.toLowerCase())
+                        .maybeSingle();
+                    
+                    if (profileErr || !profile) {
+                        throw new Error("Invalid email or username.");
+                    }
+                    targetEmail = profile.email;
+                }
+
+                const { error } = await supabase.auth.signInWithPassword({ email: targetEmail, password });
                 if (error) throw error;
             } else {
-                const { error, data } = await supabase.auth.signUp({ email, password });
-                if (error) throw error;
-                // Since email verification might be required in some supabase environments,
-                // check if session is empty but registration completed.
+                const username = authUsernameInput.value.trim().toLowerCase();
+                const email = identity;
+
+                // Username validations
+                if (!username) {
+                    throw new Error("Username is required.");
+                }
+                if (username.length < 3 || username.length > 25) {
+                    throw new Error("Username must be 3–25 characters.");
+                }
+                if (username.includes(" ")) {
+                    throw new Error("Username must not contain spaces.");
+                }
+                const usernameRegex = /^[a-zA-Z0-9_\.]+$/;
+                if (!usernameRegex.test(username)) {
+                    throw new Error('Username may only contain letters, numbers, "_" and ".".');
+                }
+
+                // Check username uniqueness before auth sign up
+                const { data: existingProf, error: checkErr } = await supabase
+                    .from('profiles')
+                    .select('username')
+                    .eq('username', username)
+                    .maybeSingle();
+                if (checkErr) throw checkErr;
+                if (existingProf) {
+                    throw new Error("Username already exists.");
+                }
+
+                const { error: signUpError, data } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            username: username
+                        }
+                    }
+                });
+                if (signUpError) throw signUpError;
+
                 if (data && !data.session) {
                     alert("Registration successful! Check your email inbox to confirm registration.");
                 }

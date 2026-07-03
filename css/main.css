@@ -51,3 +51,20 @@ body {
   color: #2563eb; /* blue-600 */
   border-top: 3px solid #2563eb;
 }
+
+/* Custom responsiveness rules */
+@media (max-width: 640px) {
+  .logo-subtitle {
+    display: none !important;
+  }
+  .bottom-nav-label {
+    display: none !important;
+  }
+  #bottom-navigation-bar button {
+    padding: 0.5rem 0.1rem !important;
+  }
+  #bottom-navigation-bar i {
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+  }
+}

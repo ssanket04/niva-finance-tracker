@@ -156,7 +156,7 @@ export async function render(container, selectedMonth) {
                 </div>
 
                 <!-- Reports Month Summary Metrics List -->
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                     <div class="bento-card p-4">
                         <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider block mb-0.5">Total Income</span>
                         <span class="font-mono font-bold text-slate-805 text-base">${formatCurrency(totalIncome)}</span>
